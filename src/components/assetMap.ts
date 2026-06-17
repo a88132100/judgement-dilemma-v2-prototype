@@ -6,6 +6,7 @@ import cardFate from '../assets/cards/card_fate.png';
 import cardPeek from '../assets/cards/card_peek.png';
 import cardShield from '../assets/cards/card_shield.png';
 import bgJudgementTable from '../assets/backgrounds/bg_judgement_table.png';
+import bgTrialRoom from '../assets/backgrounds/bg_trial_room.png';
 import tokenCommitAlliance from '../assets/tokens/token_commit_alliance.png';
 import tokenCommitBetrayal from '../assets/tokens/token_commit_betrayal.png';
 import type { CardType, Faction } from '../game/types';
@@ -30,5 +31,6 @@ export const commitmentTokenImageByFaction: Record<Faction, string> = {
 };
 
 export const backgroundImages = {
-  judgementTable: bgJudgementTable
+  judgementTable: bgJudgementTable,
+  trialRoom: bgTrialRoom
 } as const;

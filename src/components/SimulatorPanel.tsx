@@ -56,11 +56,11 @@ export function SimulatorPanel() {
 
   return (
     <details className="panel simulator-panel dev-tools-panel">
-      <summary>開發工具：Simulator / Balance Lab</summary>
+      <summary>開發工具</summary>
       <div className="panel-heading">
         <div>
-          <h2>模擬器</h2>
-          <p>使用目前 MVP 規則批量自動跑局。</p>
+          <h2>Simulator / Balance Lab</h2>
+          <p>試玩時可保持收合；開發驗證時再展開批量跑局。</p>
         </div>
         <div className="button-row">
           {[100, 500, 1000].map((gameCount) => (

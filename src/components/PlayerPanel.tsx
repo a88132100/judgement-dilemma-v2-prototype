@@ -1,4 +1,4 @@
-import { CARD_LABELS, FACTION_LABELS } from '../game/constants';
+import { CARD_LABELS, WIN_AT_JUDGMENT_POINTS } from '../game/constants';
 import type { CardType, Faction, PlayerState, RoundPhase } from '../game/types';
 import { cardBackImage, cardImageByType, commitmentTokenImageByFaction, factionCardImageByFaction } from './assetMap';
 
@@ -6,9 +6,21 @@ interface PlayerPanelProps {
   player: PlayerState;
   dealerPlayerId: string;
   phase: RoundPhase;
+  seatPosition?: 'top' | 'left' | 'right' | 'bottom';
 }
 
 const revealPhases = new Set<RoundPhase>(['reveal', 'resolveJudgment', 'drawCards', 'roundEnd', 'gameEnd']);
+
+const factionLabels: Record<Faction, string> = {
+  alliance: '盟約',
+  betrayal: '叛離'
+};
+
+const personalityLabels = {
+  honest: '守信型',
+  opportunist: '投機型',
+  observer: '觀望型'
+} as const;
 
 function slotImage(src: string, label: string, className = '') {
   return (
@@ -19,49 +31,59 @@ function slotImage(src: string, label: string, className = '') {
   );
 }
 
-function factionSlot(faction: Faction, showReveal: boolean) {
-  return showReveal ? slotImage(factionCardImageByFaction[faction], FACTION_LABELS[faction]) : slotImage(cardBackImage, '已暗放', 'is-hidden');
+function factionSlot(faction: Faction, shouldReveal: boolean) {
+  return shouldReveal ? slotImage(factionCardImageByFaction[faction], factionLabels[faction]) : slotImage(cardBackImage, '暗放', 'is-hidden');
 }
 
-function cardSlot(card: CardType, showReveal: boolean) {
-  return showReveal ? slotImage(cardImageByType[card], CARD_LABELS[card]) : slotImage(cardBackImage, '已暗放', 'is-hidden');
+function cardSlot(card: CardType, shouldReveal: boolean) {
+  return shouldReveal ? slotImage(cardImageByType[card], CARD_LABELS[card]) : slotImage(cardBackImage, '伏置', 'is-hidden');
 }
 
-export function PlayerPanel({ player, dealerPlayerId, phase }: PlayerPanelProps) {
+export function PlayerPanel({ player, dealerPlayerId, phase, seatPosition = 'top' }: PlayerPanelProps) {
   const showReveal = revealPhases.has(phase);
-  const personalityLabel = player.isHuman
-    ? '你'
-    : player.botPersonality === 'honest'
-      ? '守信型'
-      : player.botPersonality === 'opportunist'
-        ? '投機型'
-        : '觀望型';
+  const canSeeOwnHidden = player.isHuman;
+  const shouldRevealHidden = showReveal || canSeeOwnHidden;
+  const pointsToWin = Math.max(0, WIN_AT_JUDGMENT_POINTS - player.judgmentPoints);
+  const personalityLabel = player.isHuman ? '你' : personalityLabels[player.botPersonality ?? 'observer'];
+  const playStatus = player.chosenFaction ? '已暗放陣營' : '等待出牌';
+  const functionStatus = player.playedCard ? `功能牌：${showReveal || player.playedCard.isPublic || player.isHuman ? CARD_LABELS[player.playedCard.type] : '已伏置'}` : '功能牌：未使用';
 
   return (
-    <article className={`player-card seat-card ${player.isEliminated ? 'is-eliminated' : ''}`}>
+    <article className={`player-card seat-card seat-${seatPosition} ${player.isEliminated ? 'is-eliminated' : ''}`}>
       <div className="player-title">
-        <h3>{player.name}</h3>
+        <div>
+          <span className="seat-personality">{personalityLabel}</span>
+          <h3>{player.name}</h3>
+        </div>
         {dealerPlayerId === player.id ? <span className="tag">莊家</span> : null}
       </div>
-      <p className="points">{player.judgmentPoints} 裁決點</p>
-      <span className="seat-personality">{personalityLabel}</span>
 
-      <div className="seat-slot-grid">
+      <div className="seat-score-row">
+        <span>裁決點</span>
+        <strong>{player.judgmentPoints}</strong>
+      </div>
+      <p className={`win-distance ${pointsToWin <= 2 && !player.isEliminated ? 'is-close' : ''}`}>
+        {player.isEliminated ? '已出局' : pointsToWin === 0 ? '已達勝利門檻' : `距離勝利還差 ${pointsToWin} 點`}
+      </p>
+
+      <div className="seat-status-strip">
+        <span>{player.commitment ? `承諾：${factionLabels[player.commitment]}` : '尚未承諾'}</span>
+        <span>{playStatus}</span>
+        <span>{functionStatus}</span>
+      </div>
+
+      <div className="seat-slot-grid" aria-label={`${player.name} 本回合狀態`}>
         <div className="seat-slot">
           <span>承諾</span>
-          {player.commitment
-            ? player.isHuman
-              ? slotImage(commitmentTokenImageByFaction[player.commitment], FACTION_LABELS[player.commitment], 'is-token')
-              : slotImage(cardBackImage, '已承諾', 'is-hidden')
-            : '未承諾'}
+          {player.commitment ? slotImage(commitmentTokenImageByFaction[player.commitment], factionLabels[player.commitment], 'is-token') : <span className="muted">待放置</span>}
         </div>
         <div className="seat-slot">
           <span>陣營</span>
-          {player.chosenFaction ? factionSlot(player.chosenFaction, showReveal) : '未暗放'}
+          {player.chosenFaction ? factionSlot(player.chosenFaction, shouldRevealHidden) : <span className="muted">未出牌</span>}
         </div>
         <div className="seat-slot">
           <span>功能牌</span>
-          {player.playedCard ? cardSlot(player.playedCard.type, showReveal || player.playedCard.isPublic) : player.chosenFaction ? '未使用' : '未暗放'}
+          {player.playedCard ? cardSlot(player.playedCard.type, showReveal || player.playedCard.isPublic || player.isHuman) : <span className="muted">未使用</span>}
         </div>
       </div>
     </article>
