@@ -5,21 +5,20 @@ import { ActionPanel } from './ActionPanel';
 import { backgroundImages } from './assetMap';
 import { EventLog } from './EventLog';
 import { GameResultPanel } from './GameResultPanel';
-import { PhasePanel } from './PhasePanel';
 import { PlayerPanel } from './PlayerPanel';
 import { RoundSummaryPanel } from './RoundSummaryPanel';
-import { RuleHelpPanel } from './RuleHelpPanel';
-import { SimulatorPanel } from './SimulatorPanel';
 
 interface GameBoardProps {
   gameState: GameState;
   onGameStateChange: (state: GameState) => void;
+  onBackToTitle: () => void;
   onRestart: () => void;
 }
 
 const phaseTimerSeconds = {
   commitment: 30,
   discussion: 45,
+  fateDeclare: 20,
   playCards: 60,
   resolvePublicCards: 20,
   reveal: 20,
@@ -37,10 +36,9 @@ function formatTimer(seconds: number): string {
   return `${minutes}:${restSeconds}`;
 }
 
-export function GameBoard({ gameState, onGameStateChange, onRestart }: GameBoardProps) {
+export function GameBoard({ gameState, onGameStateChange, onBackToTitle, onRestart }: GameBoardProps) {
   const opponents = gameState.players.filter((player) => !player.isHuman);
   const [secondsLeft, setSecondsLeft] = useState<number>(phaseTimerSeconds[gameState.phase]);
-  const battleShellStyle = { '--trial-room-bg': `url(${backgroundImages.trialRoom})` } as CSSProperties;
   const judgementTableStyle = { '--judgement-table-bg': `url(${backgroundImages.judgementTable})` } as CSSProperties;
   const maxRounds = gameState.maxRounds ?? MAX_ROUNDS;
   const hasRoundSummary = Boolean(gameState.previousRoundResult ?? gameState.roundResults.at(-1));
@@ -59,11 +57,10 @@ export function GameBoard({ gameState, onGameStateChange, onRestart }: GameBoard
   }, [gameState.phase, gameState.round]);
 
   return (
-    <main className="battle-shell" style={battleShellStyle}>
+    <main className="battle-shell">
       <header className="battle-hud" aria-label="對局 HUD">
         <div className="hud-brand">
-          <span className="eyebrow">Prototype v0.8</span>
-          <strong>審判困境 v2</strong>
+          <strong>審判困境</strong>
         </div>
         <div className="hud-stat">
           <span>Round</span>
@@ -90,10 +87,13 @@ export function GameBoard({ gameState, onGameStateChange, onRestart }: GameBoard
           <button className="hud-icon-button" type="button" onClick={onRestart}>
             重新開始
           </button>
+          <button className="hud-icon-button" type="button" onClick={onBackToTitle}>
+            回到主畫面
+          </button>
         </div>
       </header>
 
-      <section className="battle-screen">
+      <section className="battle-screen battle-arena">
         <section className="battlefield" aria-label="地下審判桌對局區">
           {opponents[0] ? (
             <PlayerPanel player={opponents[0]} dealerPlayerId={gameState.dealerPlayerId} phase={gameState.phase} seatPosition="top" />
@@ -104,27 +104,26 @@ export function GameBoard({ gameState, onGameStateChange, onRestart }: GameBoard
           {opponents[2] ? (
             <PlayerPanel player={opponents[2]} dealerPlayerId={gameState.dealerPlayerId} phase={gameState.phase} seatPosition="right" />
           ) : null}
-          <div className="battlefield-phase-panel">
-            <PhasePanel gameState={gameState} />
-          </div>
           <section className="judgement-table" style={judgementTableStyle} aria-hidden="true" />
           <ActionPanel gameState={gameState} onGameStateChange={onGameStateChange} />
           <GameResultPanel gameState={gameState} onRestart={onRestart} />
-        </section>
 
-        <aside className="right-rail" aria-label="審判紀錄">
-          <EventLog events={gameState.eventLog} />
-          <RuleHelpPanel />
+          <details className="floating-war-report">
+            <summary>
+              <span>戰報</span>
+              <strong>{gameState.eventLog.at(-1) ?? '尚無紀錄'}</strong>
+            </summary>
+            <EventLog events={gameState.eventLog} />
+          </details>
+
           {hasRoundSummary ? (
-            <details className="side-drawer round-summary-drawer">
-              <summary>回合結算摘要</summary>
+            <details className="floating-round-report">
+              <summary>回合摘要</summary>
               <RoundSummaryPanel gameState={gameState} />
             </details>
           ) : null}
-        </aside>
+        </section>
       </section>
-
-      <SimulatorPanel />
     </main>
   );
 }

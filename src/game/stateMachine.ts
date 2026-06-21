@@ -1,7 +1,14 @@
 import { DRAW_CARDS_PER_ROUND, FACTION_LABELS, MVP_CARD_TYPES } from './constants';
-import { applyCounterCards, applyShieldCards, describeCardResolution, resolveFateCards, resolvePublicCards } from './cardResolver';
+import {
+  applyCounterCards,
+  applyShieldCards,
+  describeCardResolution,
+  hasPendingHumanPeekResolution,
+  resolveFateCards,
+  resolvePublicCards
+} from './cardResolver';
 import { canUseCardWithFaction } from './cardRules';
-import { decideBotCardPlay, decideBotCommitment, decideBotFinalFaction } from './botDecision';
+import { decideBotCardPlay, decideBotCommitment, decideBotFateDeclaration, decideBotFinalFaction } from './botDecision';
 import { drawCards, ensureDeck } from './deck';
 import { cardLabel, factionLabel } from './log';
 import { BASELINE_RULES_CONFIG, type RulesConfig } from './rulesConfig';
@@ -12,7 +19,7 @@ import {
   resolveBaseJudgment,
   resolveCommitmentDelta
 } from './judgmentResolver';
-import type { CardType, GameState, HumanPlayInput, PlayedCard, PlayerState } from './types';
+import type { CardType, FatePrediction, GameState, HumanFateDeclarationInput, HumanPlayInput, PlayedCard, PlayerState } from './types';
 
 function isValidFaction(value: unknown): value is PlayerState['chosenFaction'] {
   return value === 'alliance' || value === 'betrayal';
@@ -38,6 +45,34 @@ function withPlayedCard(player: PlayerState, playedCard?: PlayedCard): PlayerSta
   };
 }
 
+function describeFatePrediction(prediction: FatePrediction, players: PlayerState[]): string {
+  if (prediction.kind === 'majority') {
+    return `本回合將由【${factionLabel(prediction.predictedMajority)}陣營】多數`;
+  }
+  const targetName = players.find((player) => player.id === prediction.targetPlayerId)?.name ?? prediction.targetPlayerId;
+  return `${targetName} 本回合最終判定為【${factionLabel(prediction.predictedFaction)}】`;
+}
+
+function validateFatePrediction(state: GameState, userPlayerId: string, prediction?: FatePrediction): string | undefined {
+  if (!prediction) {
+    return '操作無效：宿命必須設定預言內容。';
+  }
+  if (prediction.kind === 'majority') {
+    return isValidFaction(prediction.predictedMajority) ? undefined : '操作無效：宿命多數預言的陣營不合法。';
+  }
+  const target = state.players.find((player) => player.id === prediction.targetPlayerId);
+  if (!target || target.isEliminated) {
+    return '操作無效：宿命身分預言目標必須是有效玩家。';
+  }
+  if (target.id === userPlayerId) {
+    return '操作無效：宿命身分預言不可指定自己。';
+  }
+  if (!isValidFaction(prediction.predictedFaction)) {
+    return '操作無效：宿命身分預言的陣營不合法。';
+  }
+  return undefined;
+}
+
 function resetRoundPlayer(player: PlayerState): PlayerState {
   return {
     ...player,
@@ -45,7 +80,13 @@ function resetRoundPlayer(player: PlayerState): PlayerState {
     chosenFaction: undefined,
     judgedFaction: undefined,
     playedCard: undefined,
-    hasPlayedCardThisRound: false
+    hasPlayedCardThisRound: false,
+    hasResolvedPublicCard: undefined,
+    hasResolvedFateDeclaration: undefined,
+    hasDeclaredFate: undefined,
+    hasResolvedFate: undefined,
+    hasResolvedPeek: undefined,
+    hasChangedFactionByPeek: undefined
   };
 }
 
@@ -66,6 +107,9 @@ export function validateHumanPlay(state: GameState, input: HumanPlayInput): stri
   if (!input.card) {
     return undefined;
   }
+  if (input.card.type === 'fate') {
+    return '操作無效：宿命只能在宿命宣告階段使用。';
+  }
   if (!MVP_CARD_TYPES.includes(input.card.type)) {
     return '操作無效：功能牌不屬於第一版 MVP 牌組。';
   }
@@ -79,36 +123,38 @@ export function validateHumanPlay(state: GameState, input: HumanPlayInput): stri
     return `操作無效：${cardLabel(input.card.type)} 只能搭配合作陣營使用。`;
   }
   const target = input.card.targetPlayerId ? state.players.find((player) => player.id === input.card?.targetPlayerId) : undefined;
-  if (input.card.type === 'peek') {
+  if (input.card.type === 'peek' && input.card.targetPlayerId) {
     if (!target || target.isEliminated) {
-      return '操作無效：窺探目標必須是有效玩家。';
+      return '操作無效：真理之眼目標必須是有效玩家。';
     }
     if (target.id === human.id) {
-      return '操作無效：窺探不可指定自己。';
-    }
-  }
-  if (input.card.type === 'fate') {
-    const prediction = input.card.fatePrediction;
-    if (!prediction) {
-      return '操作無效：宿命必須設定預言內容。';
-    }
-    if (prediction.kind === 'majority' && !isValidFaction(prediction.predictedMajority)) {
-      return '操作無效：宿命多數預言的陣營不合法。';
-    }
-    if (prediction.kind === 'identity') {
-      const identityTarget = state.players.find((player) => player.id === prediction.targetPlayerId);
-      if (!identityTarget || identityTarget.isEliminated) {
-        return '操作無效：宿命身分預言目標必須是有效玩家。';
-      }
-      if (identityTarget.id === human.id) {
-        return '操作無效：宿命身分預言不可指定自己。';
-      }
-      if (!isValidFaction(prediction.predictedFaction)) {
-        return '操作無效：宿命身分預言的陣營不合法。';
-      }
+      return '操作無效：真理之眼不可指定自己。';
     }
   }
   return undefined;
+}
+
+export function validateHumanFateDeclaration(state: GameState, input: HumanFateDeclarationInput): string | undefined {
+  const human = state.players.find((player) => player.isHuman);
+  if (state.phase !== 'fateDeclare') {
+    return '操作無效：目前不是宿命宣告階段。';
+  }
+  if (!human || human.isEliminated) {
+    return '操作無效：真人玩家已出局或不存在。';
+  }
+  if (human.hasResolvedFateDeclaration) {
+    return '操作無效：本回合宿命宣告已處理。';
+  }
+  if (!input.useFate) {
+    return undefined;
+  }
+  if (!human.hand.includes('fate')) {
+    return `操作無效：你的手牌中沒有 ${cardLabel('fate')}。`;
+  }
+  if (human.hasPlayedCardThisRound || human.playedCard) {
+    return '操作無效：每回合最多只能使用 1 張功能牌。';
+  }
+  return validateFatePrediction(state, human.id, input.fatePrediction);
 }
 
 export function submitHumanCommitment(state: GameState, commitment: PlayerState['commitment'], rng: () => number = Math.random): GameState {
@@ -135,6 +181,68 @@ export function submitHumanCommitment(state: GameState, commitment: PlayerState[
   };
 }
 
+export function submitHumanFateDeclaration(
+  state: GameState,
+  input: HumanFateDeclarationInput,
+  rng: () => number = Math.random
+): GameState {
+  const validationError = validateHumanFateDeclaration(state, input);
+  if (validationError) {
+    return {
+      ...state,
+      eventLog: [...state.eventLog, validationError]
+    };
+  }
+
+  const eventLog = [...state.eventLog];
+  const players = state.players.map((player) => {
+    if (player.isEliminated) {
+      return player;
+    }
+
+    if (player.isHuman) {
+      if (!input.useFate || !input.fatePrediction) {
+        eventLog.push(`${player.name} 不使用 ${cardLabel('fate')}。`);
+        return { ...player, hasResolvedFateDeclaration: true };
+      }
+      eventLog.push(`${player.name} 使用 ${cardLabel('fate')}，預言：${describeFatePrediction(input.fatePrediction, state.players)}。`);
+      return {
+        ...player,
+        hand: removeOneCard(player.hand, 'fate'),
+        playedCard: {
+          type: 'fate' as const,
+          userPlayerId: player.id,
+          fatePrediction: input.fatePrediction,
+          isPublic: true
+        },
+        hasPlayedCardThisRound: true,
+        hasResolvedFateDeclaration: true,
+        hasDeclaredFate: true
+      };
+    }
+
+    const playedCard = decideBotFateDeclaration(state, player, rng);
+    if (!playedCard?.fatePrediction) {
+      return { ...player, hasResolvedFateDeclaration: true };
+    }
+    eventLog.push(`${player.name} 使用 ${cardLabel('fate')}，預言：${describeFatePrediction(playedCard.fatePrediction, state.players)}。`);
+    return {
+      ...player,
+      hand: removeOneCard(player.hand, 'fate'),
+      playedCard,
+      hasPlayedCardThisRound: true,
+      hasResolvedFateDeclaration: true,
+      hasDeclaredFate: true
+    };
+  });
+
+  return {
+    ...state,
+    players,
+    eventLog
+  };
+}
+
 export function completeHumanPlay(state: GameState, input: HumanPlayInput, rng: () => number = Math.random): GameState {
   const validationError = validateHumanPlay(state, input);
   if (validationError) {
@@ -154,7 +262,7 @@ export function completeHumanPlay(state: GameState, input: HumanPlayInput, rng: 
             userPlayerId: player.id,
             targetPlayerId: input.card.targetPlayerId,
             fatePrediction: input.card.fatePrediction,
-            isPublic: input.card.type === 'fate' || input.card.type === 'peek'
+            isPublic: input.card.type === 'peek'
           }
         : undefined;
       return withPlayedCard({ ...player, chosenFaction: input.chosenFaction, judgedFaction: input.chosenFaction }, playedCard);
@@ -168,7 +276,7 @@ export function completeHumanPlay(state: GameState, input: HumanPlayInput, rng: 
   return {
     ...state,
     players,
-    eventLog: [...state.eventLog, `你暗中選擇原始陣營卡：${factionLabel(input.chosenFaction)}。目前 MVP 最終判定相同。`, cardLine]
+    eventLog: [...state.eventLog, `你暗中選擇原始陣營卡：${factionLabel(input.chosenFaction)}。最終判定可能受到公開功能牌影響。`, cardLine]
   };
 }
 
@@ -214,7 +322,11 @@ export function executeRoundJudgment(
       })
     ]
   };
-  return applyRoundResult(stateWithCardNotes, result, rulesConfig);
+  const resolved = applyRoundResult(stateWithCardNotes, result, rulesConfig);
+  return {
+    ...resolved,
+    players: resolved.players.map((player) => (player.playedCard?.type === 'fate' ? { ...player, hasResolvedFate: true } : player))
+  };
 }
 
 function drawForPlayers(state: GameState, rng: () => number = Math.random, rulesConfig: RulesConfig = BASELINE_RULES_CONFIG): GameState {
@@ -279,15 +391,23 @@ export function advancePhase(
       : { ...state, phase: 'discussion', eventLog: [...state.eventLog, '所有有效玩家已完成公開承諾。'] };
   }
   if (state.phase === 'discussion') {
-    return { ...state, phase: 'playCards', eventLog: [...state.eventLog, '發言階段結束，進入出牌階段。'] };
+    return { ...state, phase: 'fateDeclare', eventLog: [...state.eventLog, '發言階段結束，進入宿命宣告階段。'] };
+  }
+  if (state.phase === 'fateDeclare') {
+    return state.players.some((player) => !player.isEliminated && !player.hasResolvedFateDeclaration)
+      ? state
+      : { ...state, phase: 'playCards', eventLog: [...state.eventLog, '宿命宣告階段結束，進入出牌階段。'] };
   }
   if (state.phase === 'playCards') {
     return state.players.some((player) => !player.isEliminated && !player.judgedFaction)
       ? state
-      : { ...state, phase: 'resolvePublicCards' };
+      : { ...resolvePublicCards(state, rulesConfig, rng), phase: 'resolvePublicCards' };
   }
   if (state.phase === 'resolvePublicCards') {
-    return { ...resolvePublicCards(state, rulesConfig), phase: 'reveal' };
+    if (hasPendingHumanPeekResolution(state)) {
+      return { ...state, eventLog: [...state.eventLog, '請先完成真理之眼指定與是否更換陣營的選擇。'] };
+    }
+    return { ...resolvePublicCards(state, rulesConfig, rng), phase: 'reveal' };
   }
   if (state.phase === 'reveal') {
     const revealLines = state.players
@@ -296,9 +416,13 @@ export function advancePhase(
         (player) =>
           `${player.name} 揭示原始選擇：${FACTION_LABELS[player.chosenFaction ?? 'alliance']}；最終判定：${FACTION_LABELS[player.judgedFaction ?? 'alliance']}。`
       );
-    return { ...state, phase: 'resolveJudgment', eventLog: [...state.eventLog, ...revealLines] };
+    const stateWithRevealNotes = { ...state, phase: 'resolveJudgment' as const, eventLog: [...state.eventLog, ...revealLines] };
+    return { ...executeRoundJudgment(stateWithRevealNotes, rng, rulesConfig), phase: 'resolveJudgment' };
   }
   if (state.phase === 'resolveJudgment') {
+    if (state.roundResults.some((result) => result.round === state.round)) {
+      return { ...state, phase: state.gameOverReason ? 'gameEnd' : 'drawCards' };
+    }
     const resolved = executeRoundJudgment(state, rng, rulesConfig);
     return { ...resolved, phase: resolved.gameOverReason ? 'gameEnd' : 'drawCards' };
   }

@@ -110,7 +110,7 @@ First prototype includes:
 Only implement these cards in the first MVP:
 
 - 宿命
-- 窺探
+- 真理之眼
 - 庇護
 - 反擊
 
@@ -141,7 +141,7 @@ Important:
 Public cards in the first MVP:
 
 1. 宿命
-2. 窺探
+2. 真理之眼
 
 Hidden cards in the first MVP:
 
@@ -152,7 +152,7 @@ Full v2 order reserved for later:
 
 Public:
 1. 宿命
-2. 窺探
+2. 真理之眼
 3. 混沌
 
 Hidden:

@@ -1,8 +1,8 @@
-import { MVP_CARD_TYPES } from './constants';
+import { MVP_CARD_COUNTS, MVP_CARD_TYPES } from './constants';
 import type { CardType } from './types';
 
 export function createDeck(): CardType[] {
-  return [...MVP_CARD_TYPES, ...MVP_CARD_TYPES, ...MVP_CARD_TYPES, ...MVP_CARD_TYPES];
+  return MVP_CARD_TYPES.flatMap((cardType) => Array.from<CardType>({ length: MVP_CARD_COUNTS[cardType] }).fill(cardType));
 }
 
 export function shuffleDeck(deck: CardType[], rng: () => number = Math.random): CardType[] {

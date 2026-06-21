@@ -1,6 +1,7 @@
 import { MAX_ROUNDS, MVP_CARD_TYPES, SIMULATION_WARNING_THRESHOLDS } from './constants';
 import * as createGameModule from './createGame';
-import { decideBotCardPlay, decideBotCommitment, decideBotFinalFaction } from './botDecision';
+import { decideBotCardPlay, decideBotCommitment, decideBotFateDeclaration, decideBotFinalFaction, decideBotPeekFactionSwitch } from './botDecision';
+import { getPeekTargetPlayers, resolvePeekChoice } from './cardResolver';
 import { BALANCE_PROFILES, BASELINE_RULES_CONFIG, type BalanceProfile, type RulesConfig } from './rulesConfig';
 import * as stateMachine from './stateMachine';
 import type { BotPersonality, CardType, GameState, HumanPlayInput, PlayerState, RoundResultType } from './types';
@@ -166,6 +167,20 @@ function automateCurrentPhase(state: GameState, rng: () => number, rulesConfig: 
     return stateMachine.advancePhase(stateMachine.submitHumanCommitment(state, commitment, rng), rng, rulesConfig);
   }
 
+  if (state.phase === 'fateDeclare') {
+    const human = state.players.find((player) => player.isHuman);
+    if (!human || human.isEliminated) {
+      return stateMachine.advancePhase(state, rng, rulesConfig);
+    }
+    const fateDeclaration = decideBotFateDeclaration(state, human, rng);
+    const nextState = stateMachine.submitHumanFateDeclaration(
+      state,
+      fateDeclaration?.fatePrediction ? { useFate: true, fatePrediction: fateDeclaration.fatePrediction } : { useFate: false },
+      rng
+    );
+    return stateMachine.advancePhase(nextState, rng, rulesConfig);
+  }
+
   if (state.phase === 'playCards') {
     const human = state.players.find((player) => player.isHuman);
     if (!human || human.isEliminated) {
@@ -178,6 +193,19 @@ function automateCurrentPhase(state: GameState, rng: () => number, rulesConfig: 
       nextState = stateMachine.completeHumanPlay(state, { chosenFaction }, rng);
     }
     return stateMachine.advancePhase(nextState, rng, rulesConfig);
+  }
+
+  if (state.phase === 'resolvePublicCards') {
+    const human = state.players.find((player) => player.isHuman);
+    if (human?.playedCard?.type === 'peek' && !human.hasResolvedPeek) {
+      const targets = getPeekTargetPlayers(state, human.id);
+      const target = targets.find((candidate) => candidate.id === human.playedCard?.targetPlayerId) ?? targets[0];
+      if (target) {
+        const shouldSwitchFaction = decideBotPeekFactionSwitch(state, human, target, rng);
+        return stateMachine.advancePhase(resolvePeekChoice(state, human.id, target.id, shouldSwitchFaction).state, rng, rulesConfig);
+      }
+    }
+    return stateMachine.advancePhase(state, rng, rulesConfig);
   }
 
   return stateMachine.advancePhase(state, rng, rulesConfig);

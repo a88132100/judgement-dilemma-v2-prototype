@@ -1,21 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { applyCounterCards, applyShieldCards, resolveFateCards, resolvePublicCards } from './cardResolver';
-import { getRoundSituation, resolveBaseJudgment } from './judgmentResolver';
-import type { Faction, PlayerState } from './types';
+import {
+  applyCounterCards,
+  applyShieldCards,
+  resolveFateCards,
+  resolvePeekChoice,
+  resolvePublicCards,
+  validatePeekTarget
+} from './cardResolver';
+import { getRoundSituation, resolveBaseJudgment, resolveCommitmentDelta } from './judgmentResolver';
+import type { Faction, GameState, PlayerState } from './types';
 
 function makePlayer(args: {
   id: string;
   chosenFaction: Faction;
   judgedFaction?: Faction;
+  commitment?: Faction;
   playedCard?: PlayerState['playedCard'];
+  isHuman?: boolean;
 }): PlayerState {
   return {
     id: args.id,
     name: args.id,
-    isHuman: args.id === 'p1',
+    isHuman: args.isHuman ?? args.id === 'p1',
     judgmentPoints: 6,
     isEliminated: false,
-    commitment: args.judgedFaction ?? args.chosenFaction,
+    commitment: args.commitment ?? args.chosenFaction,
     chosenFaction: args.chosenFaction,
     judgedFaction: args.judgedFaction ?? args.chosenFaction,
     hand: [],
@@ -24,23 +33,184 @@ function makePlayer(args: {
   };
 }
 
+function makeState(players: PlayerState[]): GameState {
+  return {
+    players,
+    round: 1,
+    phase: 'resolvePublicCards',
+    dealerPlayerId: players[0]?.id ?? 'p1',
+    deck: [],
+    discardPile: [],
+    eventLog: [],
+    roundResults: []
+  };
+}
+
 describe('cardResolver', () => {
-  it('窺探看到 chosenFaction，而不是 judgedFaction', () => {
-    const state = {
-      eventLog: [],
-      players: [
+  it('真理之眼可以指定其他玩家', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' })
+    ]);
+
+    expect(validatePeekTarget(state, 'p1', 'p2')).toBeUndefined();
+  });
+
+  it('真理之眼不能指定自己', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' })
+    ]);
+
+    expect(validatePeekTarget(state, 'p1', 'p1')).toContain('不可指定自己');
+  });
+
+  it('真理之眼讀取目標 chosenFaction，而不是 judgedFaction', () => {
+    const state = makeState([
         makePlayer({
           id: 'p1',
           chosenFaction: 'alliance',
-          playedCard: { type: 'peek', userPlayerId: 'p1', targetPlayerId: 'p2', isPublic: true }
+          playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
         }),
         makePlayer({ id: 'p2', chosenFaction: 'betrayal', judgedFaction: 'alliance' })
-      ]
-    };
-    const nextState = resolvePublicCards(state as never);
+      ]);
+    const result = resolvePeekChoice(state, 'p1', 'p2', false);
 
-    expect(nextState.eventLog.at(-1)).toContain('背叛');
-    expect(nextState.eventLog.at(-1)).toContain('測試版直接寫入紀錄');
+    expect(result.peekedFaction).toBe('betrayal');
+  });
+
+  it('真理之眼後選擇不更換時，使用者陣營不變', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' })
+    ]);
+    const result = resolvePeekChoice(state, 'p1', 'p2', false);
+
+    expect(result.state.players[0].chosenFaction).toBe('alliance');
+    expect(result.state.players[0].judgedFaction).toBe('alliance');
+    expect(result.state.players[0].hasChangedFactionByPeek).toBe(false);
+  });
+
+  it('真理之眼後選擇更換時，只切換使用者自己的 judgedFaction', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' })
+    ]);
+    const result = resolvePeekChoice(state, 'p1', 'p2', true);
+
+    expect(result.state.players[0].chosenFaction).toBe('alliance');
+    expect(result.state.players[0].judgedFaction).toBe('betrayal');
+    expect(result.state.players[1].judgedFaction).toBe('betrayal');
+    expect(result.state.players[0].hasChangedFactionByPeek).toBe(true);
+  });
+
+  it('更換陣營後公開紀錄不揭露新陣營內容', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' })
+    ]);
+    const result = resolvePeekChoice(state, 'p1', 'p2', true);
+    const publicLine = result.state.eventLog.at(-1) ?? '';
+
+    expect(publicLine).toBe('p1 已重新選擇陣營。');
+    expect(publicLine).not.toContain('合作');
+    expect(publicLine).not.toContain('背叛');
+  });
+
+  it('承諾守諾或失信以真理之眼更換後的 judgedFaction 判定', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        commitment: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' })
+    ]);
+    const result = resolvePeekChoice(state, 'p1', 'p2', true).state;
+    const situation = getRoundSituation(result.players);
+    const commitmentDelta = resolveCommitmentDelta(result.players, situation);
+
+    expect(result.players[0].judgedFaction).toBe('betrayal');
+    expect(commitmentDelta.p1).toBe(-1);
+  });
+
+  it('真理之眼後仍可被後續強制效果覆寫最終判定陣營', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        commitment: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' })
+    ]);
+    const afterPeek = resolvePeekChoice(state, 'p1', 'p2', true).state;
+    const afterForcedReverse = {
+      ...afterPeek,
+      players: afterPeek.players.map((player) => (player.id === 'p1' ? { ...player, judgedFaction: 'alliance' as const } : player))
+    };
+    const situation = getRoundSituation(afterForcedReverse.players);
+    const commitmentDelta = resolveCommitmentDelta(afterForcedReverse.players, situation);
+
+    expect(situation.judgedFactionByPlayerId.p1).toBe('alliance');
+    expect(commitmentDelta.p1).toBe(1);
+  });
+
+  it('公開型解析不會把真理之眼揭示的陣營寫入公開紀錄', () => {
+    const state = makeState([
+      makePlayer({ id: 'p1', chosenFaction: 'alliance', isHuman: true }),
+      makePlayer({
+        id: 'p2',
+        chosenFaction: 'betrayal',
+        isHuman: false,
+        playedCard: { type: 'peek', userPlayerId: 'p2', targetPlayerId: 'p1', isPublic: true }
+      })
+    ]);
+    const nextState = resolvePublicCards(state, undefined, () => 0);
+    const publicLine = nextState.eventLog.at(-1) ?? '';
+
+    expect(publicLine).not.toContain('合作');
+    expect(publicLine).not.toContain('背叛');
+  });
+
+  it('真理之眼確認後不可再次改查第二名玩家', () => {
+    const state = makeState([
+      makePlayer({
+        id: 'p1',
+        chosenFaction: 'alliance',
+        playedCard: { type: 'peek', userPlayerId: 'p1', isPublic: true }
+      }),
+      makePlayer({ id: 'p2', chosenFaction: 'betrayal' }),
+      makePlayer({ id: 'p3', chosenFaction: 'alliance' })
+    ]);
+    const firstResolution = resolvePeekChoice(state, 'p1', 'p2', false).state;
+    const secondResolution = resolvePeekChoice(firstResolution, 'p1', 'p3', true);
+
+    expect(secondResolution.error).toContain('已完成');
+    expect(secondResolution.state.players[0].playedCard?.targetPlayerId).toBe('p2');
+    expect(secondResolution.state.players[0].judgedFaction).toBe('alliance');
+    expect(secondResolution.state.eventLog).toHaveLength(firstResolution.eventLog.length);
   });
 
   it('庇護依 judgedFaction 判定合作玩家，且只減少基礎損失', () => {

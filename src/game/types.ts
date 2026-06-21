@@ -3,6 +3,7 @@ export type Faction = 'alliance' | 'betrayal';
 export type RoundPhase =
   | 'commitment'
   | 'discussion'
+  | 'fateDeclare'
   | 'playCards'
   | 'resolvePublicCards'
   | 'reveal'
@@ -46,6 +47,12 @@ export interface PlayerState {
   hand: CardType[];
   playedCard?: PlayedCard;
   hasPlayedCardThisRound: boolean;
+  hasResolvedPublicCard?: boolean;
+  hasResolvedFateDeclaration?: boolean;
+  hasDeclaredFate?: boolean;
+  hasResolvedFate?: boolean;
+  hasResolvedPeek?: boolean;
+  hasChangedFactionByPeek?: boolean;
 }
 
 export type RoundResultType =
@@ -104,4 +111,9 @@ export interface HumanPlayInput {
     targetPlayerId?: string;
     fatePrediction?: FatePrediction;
   };
+}
+
+export interface HumanFateDeclarationInput {
+  useFate: boolean;
+  fatePrediction?: FatePrediction;
 }

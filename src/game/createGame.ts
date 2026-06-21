@@ -1,4 +1,5 @@
 import { createDeck, drawCards, shuffleDeck } from './deck';
+import { DEFAULT_OPPONENTS, type OpponentMetadata } from './opponents';
 import { BASELINE_RULES_CONFIG, type RulesConfig } from './rulesConfig';
 import type { BotPersonality, GameState, PlayerState } from './types';
 
@@ -6,18 +7,21 @@ const botPersonalities: BotPersonality[] = ['honest', 'opportunist', 'observer']
 
 export function createInitialPlayers(
   deck: ReturnType<typeof createDeck>,
-  rulesConfig: RulesConfig = BASELINE_RULES_CONFIG
+  rulesConfig: RulesConfig = BASELINE_RULES_CONFIG,
+  opponents: readonly OpponentMetadata[] = DEFAULT_OPPONENTS
 ): { players: PlayerState[]; deck: ReturnType<typeof createDeck> } {
   let nextDeck = deck;
-  const names = ['你', '守信型 Bot', '投機型 Bot', '觀望型 Bot'];
+  const resolvedOpponents = botPersonalities.map((_, index) => opponents[index] ?? DEFAULT_OPPONENTS[index]);
+  const names = ['你', ...resolvedOpponents.map((opponent) => opponent.name)];
   const players = names.map((name, index): PlayerState => {
     const drawResult = drawCards(nextDeck, rulesConfig.initialHandSize);
     nextDeck = drawResult.deck;
+    const opponent = index === 0 ? undefined : resolvedOpponents[index - 1];
     return {
       id: `player-${index + 1}`,
       name,
       isHuman: index === 0,
-      botPersonality: index === 0 ? undefined : botPersonalities[index - 1],
+      botPersonality: index === 0 ? undefined : opponent?.personality ?? botPersonalities[index - 1],
       judgmentPoints: rulesConfig.startingJudgmentPoints,
       isEliminated: false,
       hand: drawResult.drawn,
@@ -27,10 +31,13 @@ export function createInitialPlayers(
   return { players, deck: nextDeck };
 }
 
-export function createGame(rng: () => number = Math.random, options: { maxRounds?: number; rulesConfig?: RulesConfig } = {}): GameState {
+export function createGame(
+  rng: () => number = Math.random,
+  options: { maxRounds?: number; rulesConfig?: RulesConfig; opponents?: readonly OpponentMetadata[] } = {}
+): GameState {
   const rulesConfig = options.rulesConfig ?? BASELINE_RULES_CONFIG;
   const shuffledDeck = shuffleDeck(createDeck(), rng);
-  const { players, deck } = createInitialPlayers(shuffledDeck, rulesConfig);
+  const { players, deck } = createInitialPlayers(shuffledDeck, rulesConfig, options.opponents ?? DEFAULT_OPPONENTS);
   return {
     players,
     round: 1,

@@ -9,7 +9,8 @@ interface PhasePanelProps {
 
 const phaseHints: Record<RoundPhase, string[]> = {
   commitment: ['請選擇本回合你要公開承諾的陣營。', '承諾與最終出牌一致會 +1，不一致會 -1。'],
-  discussion: ['此階段用於觀察其他玩家承諾與推測意圖。', 'Prototype 可直接推進。'],
+  discussion: ['此階段用於觀察其他玩家承諾與推測意圖。', '可直接推進至下一階段。'],
+  fateDeclare: ['宿命可在此階段宣告預言。', '未使用宿命時可直接推進。'],
   playCards: ['請將合作或背叛放到陣營暗放槽。', '你可以選擇 1 張功能牌，或不使用功能牌。'],
   resolvePublicCards: ['公開型功能牌將依序處理。'],
   reveal: ['本回合將揭示陣營並準備計算裁決點數。'],

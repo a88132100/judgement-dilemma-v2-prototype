@@ -14,6 +14,7 @@ export const BOT_OPPORTUNIST_ALLIANCE_COMMITMENT_THRESHOLD = 2;
 export const ROUND_PHASES: RoundPhase[] = [
   'commitment',
   'discussion',
+  'fateDeclare',
   'playCards',
   'resolvePublicCards',
   'reveal',
@@ -23,8 +24,14 @@ export const ROUND_PHASES: RoundPhase[] = [
 ];
 
 export const MVP_CARD_TYPES: CardType[] = ['fate', 'peek', 'shield', 'counter'];
+export const MVP_CARD_COUNTS: Record<CardType, number> = {
+  fate: 4,
+  peek: 5,
+  shield: 4,
+  counter: 4
+};
 
-export const PUBLIC_CARD_RESOLVE_ORDER: CardType[] = ['fate', 'peek'];
+export const PUBLIC_CARD_RESOLVE_ORDER: CardType[] = ['peek'];
 export const HIDDEN_CARD_RESOLVE_ORDER: CardType[] = ['shield', 'counter'];
 
 export const BASE_JUDGMENT_DELTAS = {
@@ -110,7 +117,7 @@ export const BOT_WEIGHTS: Record<BotPersonality, {
 
 export const CARD_LABELS: Record<CardType, string> = {
   fate: '宿命',
-  peek: '窺探',
+  peek: '真理之眼',
   shield: '庇護',
   counter: '反擊'
 };
@@ -123,6 +130,7 @@ export const FACTION_LABELS = {
 export const PHASE_LABELS: Record<RoundPhase, string> = {
   commitment: '承諾階段',
   discussion: '發言階段',
+  fateDeclare: '宿命宣告階段',
   playCards: '出牌階段',
   resolvePublicCards: '公開型功能牌觸發',
   reveal: '揭示階段',

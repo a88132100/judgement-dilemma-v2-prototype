@@ -25,10 +25,10 @@ export function DraggableCard({ className = '', disabled = false, imageSrc, labe
 
   return (
     <button
-      className={`draggable-card ${selected ? 'is-selected' : ''} ${className}`}
+      className={`draggable-card ${selected ? 'is-selected' : ''} ${disabled ? 'is-disabled' : ''} ${className}`}
       type="button"
       draggable={!disabled}
-      disabled={disabled}
+      aria-pressed={selected}
       onClick={onClick}
       onDragStart={handleDragStart}
     >

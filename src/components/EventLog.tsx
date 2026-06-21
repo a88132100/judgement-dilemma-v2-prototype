@@ -3,7 +3,7 @@ interface EventLogProps {
 }
 
 export function EventLog({ events }: EventLogProps) {
-  const recentEvents = events.slice(-5).reverse();
+  const recentEvents = events.slice(-4).reverse();
   const fullEvents = [...events].reverse();
 
   return (
