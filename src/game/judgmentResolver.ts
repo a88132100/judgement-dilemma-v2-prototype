@@ -167,6 +167,14 @@ function pickHighestPlayers(players: PlayerState[]): PlayerState[] {
   return players.filter((player) => player.judgmentPoints === highestJudgment);
 }
 
+function describeNewEliminations(previousPlayers: PlayerState[], players: PlayerState[], result: RoundResult): string[] {
+  const previousById = new Map(previousPlayers.map((player) => [player.id, player]));
+  return players
+    .filter((player) => result.situation.validPlayerIds.includes(player.id))
+    .filter((player) => player.isEliminated && !previousById.get(player.id)?.isEliminated)
+    .map((player) => `${player.name} 裁決點數歸零，已出局。`);
+}
+
 export function applyRoundResult(state: GameState, result: RoundResult, rulesConfig: RulesConfig = BASELINE_RULES_CONFIG): GameState {
   const players = state.players.map((player) => {
     if (!result.situation.validPlayerIds.includes(player.id)) {
@@ -205,6 +213,7 @@ export function applyRoundResult(state: GameState, result: RoundResult, rulesCon
 
   const isTie = Boolean(winnerPlayerIds && winnerPlayerIds.length > 1);
   const winnerPlayerId = winnerPlayerIds?.length === 1 ? winnerPlayerIds[0] : undefined;
+  const eliminationLines = describeNewEliminations(state.players, players, result);
 
   return {
     ...state,
@@ -215,6 +224,6 @@ export function applyRoundResult(state: GameState, result: RoundResult, rulesCon
     winnerPlayerIds,
     isTie,
     gameOverReason,
-    eventLog: [...state.eventLog, ...describeRoundResult(result, players)]
+    eventLog: [...state.eventLog, ...describeRoundResult(result, players), ...eliminationLines]
   };
 }

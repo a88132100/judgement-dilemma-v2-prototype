@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { cardImageByType, commitmentTokenImageByFaction, factionCardImageByFaction } from './assetMap';
+import { cardBackImage, cardImageByType, commitmentTokenImageByFaction, factionCardImageByFaction } from './assetMap';
 import { getCardDetail, type CardDetailTarget } from './cardDetails';
 
 interface CardDetailPanelProps {
@@ -14,6 +14,9 @@ function imageForTarget(target: CardDetailTarget): string {
   }
   if (target.kind === 'faction') {
     return factionCardImageByFaction[target.faction];
+  }
+  if (target.kind === 'blankFunction') {
+    return cardBackImage;
   }
   return cardImageByType[target.cardType];
 }

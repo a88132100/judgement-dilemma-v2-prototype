@@ -12,6 +12,9 @@ export type CardDetailTarget =
   | {
       kind: 'function';
       cardType: CardType;
+    }
+  | {
+      kind: 'blankFunction';
     };
 
 export interface CardDetail {
@@ -87,12 +90,23 @@ const functionCardDetails: Record<CardType, CardDetail> = {
   }
 };
 
+const blankFunctionDetail: CardDetail = {
+  name: '空白密令',
+  typeLabel: '空白功能牌',
+  timing: '出牌階段暗放，揭示階段公開。',
+  effect: '無效果。本回合視為沒有使用功能牌。',
+  notes: '揭示前與真正功能牌同樣以卡背顯示，用來避免提前暴露你沒有使用功能牌。'
+};
+
 export function getCardDetail(target: CardDetailTarget): CardDetail {
   if (target.kind === 'commitment') {
     return commitmentDetails[target.faction];
   }
   if (target.kind === 'faction') {
     return factionDetails[target.faction];
+  }
+  if (target.kind === 'blankFunction') {
+    return blankFunctionDetail;
   }
   return functionCardDetails[target.cardType];
 }

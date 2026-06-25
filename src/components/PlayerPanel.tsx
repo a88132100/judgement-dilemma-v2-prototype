@@ -1,6 +1,6 @@
 import { CARD_LABELS, WIN_AT_JUDGMENT_POINTS } from '../game/constants';
 import { DEFAULT_OPPONENTS } from '../game/opponents';
-import type { Faction, PlayerState, RoundPhase } from '../game/types';
+import type { CardType, Faction, FunctionCardSelection, PlayerState, RoundPhase } from '../game/types';
 import { cardBackImage, cardImageByType, commitmentTokenImageByFaction, factionCardImageByFaction } from './assetMap';
 
 interface PlayerPanelProps {
@@ -40,8 +40,13 @@ function avatarForPlayer(player: PlayerState): string | undefined {
   return DEFAULT_OPPONENTS.find((opponent) => opponent.personality === player.botPersonality)?.avatar;
 }
 
+function cardTypeSelection(selection: FunctionCardSelection | undefined): CardType | undefined {
+  return selection && selection !== 'blank' ? selection : undefined;
+}
+
 export function PlayerPanel({ player, dealerPlayerId, phase, seatPosition = 'top' }: PlayerPanelProps) {
   const showReveal = revealPhases.has(phase);
+  const showPublicFunction = phase === 'resolvePublicCards' && Boolean(player.playedCard?.isPublic);
   const canSeeOwnHidden = player.isHuman;
   const shouldRevealHidden = showReveal || canSeeOwnHidden;
   const pointsToWin = Math.max(0, WIN_AT_JUDGMENT_POINTS - player.judgmentPoints);
@@ -50,9 +55,21 @@ export function PlayerPanel({ player, dealerPlayerId, phase, seatPosition = 'top
   const commitmentImage = player.commitment ? commitmentTokenImageByFaction[player.commitment] : undefined;
   const factionLabel = player.chosenFaction ? (shouldRevealHidden ? factionLabels[player.chosenFaction] : '已暗放') : '未出牌';
   const factionImage = player.chosenFaction ? (shouldRevealHidden ? factionCardImageByFaction[player.chosenFaction] : cardBackImage) : undefined;
-  const shownFunctionName = player.playedCard && (showReveal || player.playedCard.isPublic || player.isHuman) ? CARD_LABELS[player.playedCard.type] : '已伏置';
-  const functionLabel = player.playedCard ? shownFunctionName : '未使用';
-  const functionImage = player.playedCard ? (showReveal || player.playedCard.isPublic || player.isHuman ? cardImageByType[player.playedCard.type] : cardBackImage) : undefined;
+  const functionSelection = player.functionCardSelection ?? player.playedCard?.type ?? (player.chosenFaction ? 'blank' : undefined);
+  const visibleFunctionType = cardTypeSelection(functionSelection);
+  const shouldRevealFunction = showReveal || showPublicFunction || canSeeOwnHidden;
+  const functionLabel = functionSelection
+    ? shouldRevealFunction
+      ? functionSelection === 'blank'
+        ? '空白密令'
+        : CARD_LABELS[functionSelection]
+      : '已暗放'
+    : '未暗放';
+  const functionImage = functionSelection
+    ? shouldRevealFunction && visibleFunctionType
+      ? cardImageByType[visibleFunctionType]
+      : cardBackImage
+    : undefined;
   const avatar = avatarForPlayer(player);
   const avatarFallback = player.isHuman ? '你' : player.name.slice(0, 2);
 
@@ -81,7 +98,7 @@ export function PlayerPanel({ player, dealerPlayerId, phase, seatPosition = 'top
       <div className="seat-status-badges" aria-label={`${player.name} 本回合狀態`}>
         {statusBadge('承諾', commitmentLabel, commitmentImage, player.commitment ? 'has-token' : '')}
         {statusBadge('陣營', factionLabel, factionImage, player.chosenFaction ? 'has-card' : '')}
-        {statusBadge('功能', functionLabel, functionImage, player.playedCard ? 'has-card' : '')}
+        {statusBadge('功能', functionLabel, functionImage, functionSelection ? 'has-card' : '')}
       </div>
     </article>
   );

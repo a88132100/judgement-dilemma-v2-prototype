@@ -35,12 +35,16 @@ function removeOneCard(hand: CardType[], card: CardType): CardType[] {
 
 function withPlayedCard(player: PlayerState, playedCard?: PlayedCard): PlayerState {
   if (!playedCard) {
-    return player;
+    return {
+      ...player,
+      functionCardSelection: player.functionCardSelection ?? player.playedCard?.type ?? 'blank'
+    };
   }
   return {
     ...player,
     hand: removeOneCard(player.hand, playedCard.type),
     playedCard,
+    functionCardSelection: playedCard.type,
     hasPlayedCardThisRound: true
   };
 }
@@ -80,6 +84,7 @@ function resetRoundPlayer(player: PlayerState): PlayerState {
     chosenFaction: undefined,
     judgedFaction: undefined,
     playedCard: undefined,
+    functionCardSelection: undefined,
     hasPlayedCardThisRound: false,
     hasResolvedPublicCard: undefined,
     hasResolvedFateDeclaration: undefined,
@@ -215,6 +220,7 @@ export function submitHumanFateDeclaration(
           fatePrediction: input.fatePrediction,
           isPublic: true
         },
+        functionCardSelection: 'fate' as const,
         hasPlayedCardThisRound: true,
         hasResolvedFateDeclaration: true,
         hasDeclaredFate: true
@@ -230,6 +236,7 @@ export function submitHumanFateDeclaration(
       ...player,
       hand: removeOneCard(player.hand, 'fate'),
       playedCard,
+      functionCardSelection: 'fate' as const,
       hasPlayedCardThisRound: true,
       hasResolvedFateDeclaration: true,
       hasDeclaredFate: true
@@ -272,11 +279,14 @@ export function completeHumanPlay(state: GameState, input: HumanPlayInput, rng: 
     const legalPlayedCard = playedCard && canUseCardWithFaction(playedCard.type, botFaction) ? playedCard : undefined;
     return withPlayedCard({ ...player, chosenFaction: botFaction, judgedFaction: botFaction }, legalPlayedCard);
   });
-  const cardLine = input.card ? `你使用 ${cardLabel(input.card.type)}。` : '你沒有使用功能牌。';
   return {
     ...state,
     players,
-    eventLog: [...state.eventLog, `你暗中選擇原始陣營卡：${factionLabel(input.chosenFaction)}。最終判定可能受到公開功能牌影響。`, cardLine]
+    eventLog: [
+      ...state.eventLog,
+      `你暗中選擇原始陣營卡：${factionLabel(input.chosenFaction)}。最終判定可能受到公開功能牌影響。`,
+      '你已在功能牌區暗放 1 張密令。'
+    ]
   };
 }
 
@@ -412,12 +422,20 @@ export function advancePhase(
   if (state.phase === 'reveal') {
     const revealLines = state.players
       .filter((player) => !player.isEliminated && player.chosenFaction && player.judgedFaction)
-      .map(
-        (player) =>
-          `${player.name} 揭示原始選擇：${FACTION_LABELS[player.chosenFaction ?? 'alliance']}；最終判定：${FACTION_LABELS[player.judgedFaction ?? 'alliance']}。`
-      );
+      .flatMap((player) => {
+        const functionSelection = player.functionCardSelection ?? player.playedCard?.type ?? 'blank';
+        const functionLine =
+          functionSelection === 'blank'
+            ? `${player.name} 本回合未使用功能牌。`
+            : `${player.name} 揭示功能牌：${cardLabel(functionSelection)}。`;
+        return [
+          `${player.name} 揭示原始選擇：${FACTION_LABELS[player.chosenFaction ?? 'alliance']}；最終判定：${FACTION_LABELS[player.judgedFaction ?? 'alliance']}。`,
+          functionLine
+        ];
+      });
     const stateWithRevealNotes = { ...state, phase: 'resolveJudgment' as const, eventLog: [...state.eventLog, ...revealLines] };
-    return { ...executeRoundJudgment(stateWithRevealNotes, rng, rulesConfig), phase: 'resolveJudgment' };
+    const resolved = executeRoundJudgment(stateWithRevealNotes, rng, rulesConfig);
+    return { ...resolved, phase: resolved.gameOverReason ? 'gameEnd' : 'resolveJudgment' };
   }
   if (state.phase === 'resolveJudgment') {
     if (state.roundResults.some((result) => result.round === state.round)) {

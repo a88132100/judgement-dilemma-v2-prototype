@@ -214,3 +214,40 @@ describe('judgmentResolver', () => {
     expect(nextState.winnerPlayerId).toBe('p1');
   });
 });
+
+describe('elimination and game end checks', () => {
+  it('裁決點數 <= 0 時會立刻標記出局，並在只剩一人時結束遊戲', () => {
+    const testPlayers = players(['betrayal', 'alliance'], ['alliance', 'alliance']);
+    testPlayers[0] = { ...testPlayers[0], judgmentPoints: 1 };
+    testPlayers[1] = { ...testPlayers[1], judgmentPoints: 6 };
+    const situation = getRoundSituation(testPlayers);
+    const state = {
+      players: testPlayers,
+      round: 1,
+      phase: 'resolveJudgment',
+      dealerPlayerId: 'p1',
+      deck: [],
+      discardPile: [],
+      eventLog: [],
+      roundResults: []
+    } as GameState;
+    const result = buildFinalRoundResult({
+      state,
+      situation,
+      baseDeltaByPlayerId: { p1: -1, p2: -1 },
+      adjustedBaseDeltaByPlayerId: { p1: -1, p2: -1 },
+      shieldDeltaByPlayerId: { p1: 0, p2: 0 },
+      counterDeltaByPlayerId: { p1: 0, p2: 0 },
+      fateDeltaByPlayerId: { p1: 0, p2: 0 },
+      commitmentDeltaByPlayerId: { p1: -1, p2: 1 }
+    });
+    const nextState = applyRoundResult(state, result);
+
+    expect(nextState.players[0].judgmentPoints).toBe(-1);
+    expect(nextState.players[0].isEliminated).toBe(true);
+    expect(nextState.players[1].isEliminated).toBe(false);
+    expect(nextState.gameOverReason).toBe('allButOneEliminated');
+    expect(nextState.winnerPlayerIds).toEqual(['p2']);
+    expect(nextState.eventLog).toContain(`${testPlayers[0].name} 裁決點數歸零，已出局。`);
+  });
+});

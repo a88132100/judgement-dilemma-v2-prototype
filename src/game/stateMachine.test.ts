@@ -193,5 +193,56 @@ describe('stateMachine core validation', () => {
 
     expect(nextState.players[0].chosenFaction).toBe('betrayal');
     expect(nextState.players[0].playedCard).toBeUndefined();
+    expect(nextState.players[0].functionCardSelection).toBe('blank');
+    expect(nextState.eventLog.at(-1)).toContain('暗放 1 張密令');
+  });
+});
+
+describe('stateMachine elimination flow', () => {
+  it('reveal 結算後若只剩 1 名未出局玩家，會直接進入 gameEnd', () => {
+    const state = {
+      players: [
+        {
+          id: 'p1',
+          name: '玩家 1',
+          isHuman: true,
+          judgmentPoints: 1,
+          isEliminated: false,
+          commitment: 'alliance',
+          chosenFaction: 'betrayal',
+          judgedFaction: 'betrayal',
+          hand: [],
+          hasPlayedCardThisRound: false
+        },
+        {
+          id: 'p2',
+          name: '玩家 2',
+          isHuman: false,
+          botPersonality: 'honest',
+          judgmentPoints: 6,
+          isEliminated: false,
+          commitment: 'alliance',
+          chosenFaction: 'alliance',
+          judgedFaction: 'alliance',
+          hand: [],
+          hasPlayedCardThisRound: false
+        }
+      ],
+      round: 1,
+      maxRounds: 10,
+      phase: 'reveal',
+      dealerPlayerId: 'p1',
+      deck: [],
+      discardPile: [],
+      eventLog: [],
+      roundResults: []
+    } as GameState;
+
+    const nextState = advancePhase(state);
+
+    expect(nextState.phase).toBe('gameEnd');
+    expect(nextState.gameOverReason).toBe('allButOneEliminated');
+    expect(nextState.players[0].isEliminated).toBe(true);
+    expect(nextState.winnerPlayerIds).toEqual(['p2']);
   });
 });

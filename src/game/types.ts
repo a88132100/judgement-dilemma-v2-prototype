@@ -13,6 +13,7 @@ export type RoundPhase =
   | 'gameEnd';
 
 export type CardType = 'fate' | 'peek' | 'shield' | 'counter';
+export type FunctionCardSelection = CardType | 'blank';
 export type BotPersonality = 'honest' | 'opportunist' | 'observer';
 
 export type FatePrediction =
@@ -46,6 +47,7 @@ export interface PlayerState {
   judgedFaction?: Faction;
   hand: CardType[];
   playedCard?: PlayedCard;
+  functionCardSelection?: FunctionCardSelection;
   hasPlayedCardThisRound: boolean;
   hasResolvedPublicCard?: boolean;
   hasResolvedFateDeclaration?: boolean;
