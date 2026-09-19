@@ -4,6 +4,7 @@ import { TablePlayArea } from './TablePlayArea';
 interface ActionPanelProps {
   gameState: GameState;
   onGameStateChange: (state: GameState) => void;
+  flowPaused?: boolean;
 }
 
 export function ActionPanel(props: ActionPanelProps) {

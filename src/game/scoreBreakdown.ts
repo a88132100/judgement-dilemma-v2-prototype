@@ -67,6 +67,9 @@ function describeFunctionReason(player: PlayerState, result: RoundResult): strin
   const fateDelta = valueOf(result.fateDeltaByPlayerId, player.id);
   const shieldDelta = valueOf(result.shieldDeltaByPlayerId, player.id);
   const counterDelta = valueOf(result.counterDeltaByPlayerId, player.id);
+  const mirrorDelta = valueOf(result.mirrorDeltaByPlayerId, player.id);
+  const gambleDelta = valueOf(result.gambleDeltaByPlayerId, player.id);
+  const expediencyDelta = valueOf(result.expediencyDeltaByPlayerId, player.id);
   const lines: string[] = [];
 
   if (player.functionCardSelection === 'blank') {
@@ -74,6 +77,12 @@ function describeFunctionReason(player: PlayerState, result: RoundResult): strin
   }
   if (player.playedCard?.type === 'peek') {
     lines.push('真理之眼提供翻牌前資訊，不直接改變裁決點數。');
+  }
+  if (player.playedCard?.type === 'chaos') {
+    lines.push('混沌會反轉指定玩家的最終陣營，不直接提供裁決點數修正。');
+  }
+  if (player.disabledFunctionCardThisRound && player.playedCard) {
+    lines.push(`${player.playedCard.type === 'gamble' ? '賭命' : '暗放型功能牌'}被混沌指定而失效。`);
   }
   if (fateDelta !== 0) {
     lines.push(`宿命修正 ${signed(fateDelta)}。`);
@@ -84,6 +93,15 @@ function describeFunctionReason(player: PlayerState, result: RoundResult): strin
   if (counterDelta !== 0) {
     lines.push(`反擊修正 ${signed(counterDelta)}。`);
   }
+  if (mirrorDelta !== 0) {
+    lines.push(`鏡像修正 ${signed(mirrorDelta)}。`);
+  }
+  if (gambleDelta !== 0) {
+    lines.push(`賭命修正 ${signed(gambleDelta)}。`);
+  }
+  if (expediencyDelta !== 0) {
+    lines.push(`權宜牌修正 ${signed(expediencyDelta)}。`);
+  }
 
   return lines.length > 0 ? lines.join(' ') : '本回合沒有功能牌分數修正。';
 }
@@ -93,6 +111,9 @@ function describePromiseReason(player: PlayerState, judgedFaction: Faction, prom
     return '未記錄承諾，因此無法顯示守諾或失信原因。';
   }
   const resultText = promiseDelta >= 0 ? '守諾' : '失信';
+  if (player.chaosTargetedThisRound && promiseDelta === 0) {
+    return `承諾${factionLabels[player.commitment]}，因混沌導致最終判定變為${factionLabels[judgedFaction]}，本回合不獲得守諾獎勵也不承擔失信懲罰。`;
+  }
   return `承諾${factionLabels[player.commitment]}，實際${factionLabels[judgedFaction]}，${resultText} ${signed(promiseDelta)}。`;
 }
 
@@ -102,7 +123,10 @@ export function buildScoreBreakdown(player: PlayerState, result: RoundResult): S
   const functionCardDelta =
     valueOf(result.fateDeltaByPlayerId, player.id) +
     valueOf(result.shieldDeltaByPlayerId, player.id) +
-    valueOf(result.counterDeltaByPlayerId, player.id);
+    valueOf(result.counterDeltaByPlayerId, player.id) +
+    valueOf(result.mirrorDeltaByPlayerId, player.id) +
+    valueOf(result.gambleDeltaByPlayerId, player.id) +
+    valueOf(result.expediencyDeltaByPlayerId, player.id);
   const promiseDelta = valueOf(result.commitmentDeltaByPlayerId, player.id);
   const finalDelta = valueOf(result.finalDeltaByPlayerId, player.id);
   const finalScore = player.judgmentPoints;

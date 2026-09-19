@@ -74,7 +74,10 @@ function roundResult(validPlayerIds: string[]): RoundResult {
     adjustedBaseDeltaByPlayerId: {},
     shieldDeltaByPlayerId: {},
     counterDeltaByPlayerId: {},
+    mirrorDeltaByPlayerId: {},
     fateDeltaByPlayerId: {},
+    gambleDeltaByPlayerId: {},
+    expediencyDeltaByPlayerId: {},
     commitmentDeltaByPlayerId: {},
     finalDeltaByPlayerId: {},
     revealedFactionsByPlayerId: {},
@@ -204,7 +207,21 @@ describe('simulator', () => {
       averageRoundsByEndReason: { judgmentWin: 5, maxRounds: 0, allButOneEliminated: 0, allEliminatedTieBreak: 0 },
       roundSituationFrequency: { loneHero: 0.1, allAlliance: 0.1, allBetrayal: 0.1, equal: 0.2, minorityBetrayal: 0.5, betrayalOverload: 0 },
       commitmentStats: { keptCommitmentCount: 1, brokenCommitmentCount: 1, keepRate: 0.5 },
-      cardUsageStats: { fate: 0, peek: 0, shield: 0, counter: 0 }
+      cardUsageStats: {
+        fate: 0,
+        peek: 0,
+        chaos: 0,
+        shield: 0,
+        counter: 0,
+        mirror: 0,
+        gamble: 0,
+        smallGain: 0,
+        promiseTax: 0,
+        favor: 0,
+        consensus: 0,
+        slip: 0,
+        evenOmen: 0
+      }
     });
 
     expect(warnings.some((warning) => warning.includes('有明確勝者的局中勝率偏高'))).toBe(true);

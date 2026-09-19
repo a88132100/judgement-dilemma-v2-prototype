@@ -23,16 +23,44 @@ export const ROUND_PHASES: RoundPhase[] = [
   'roundEnd'
 ];
 
-export const MVP_CARD_TYPES: CardType[] = ['fate', 'peek', 'shield', 'counter'];
+export const MVP_CARD_TYPES: CardType[] = ['fate', 'peek', 'chaos', 'shield', 'counter', 'mirror', 'gamble'];
+export const EXPEDIENCY_CARD_TYPES: CardType[] = ['smallGain', 'promiseTax', 'favor', 'consensus', 'slip', 'evenOmen'];
+export const IMPLEMENTED_CARD_TYPES: CardType[] = [...MVP_CARD_TYPES, ...EXPEDIENCY_CARD_TYPES];
+
 export const MVP_CARD_COUNTS: Record<CardType, number> = {
-  fate: 4,
+  fate: 6,
   peek: 5,
-  shield: 4,
-  counter: 4
+  chaos: 1,
+  shield: 5,
+  counter: 5,
+  mirror: 2,
+  gamble: 2,
+  smallGain: 0,
+  promiseTax: 0,
+  favor: 0,
+  consensus: 0,
+  slip: 0,
+  evenOmen: 0
 };
 
-export const PUBLIC_CARD_RESOLVE_ORDER: CardType[] = ['peek'];
-export const HIDDEN_CARD_RESOLVE_ORDER: CardType[] = ['shield', 'counter'];
+export const EXPEDIENCY_CARD_COUNTS: Record<CardType, number> = {
+  fate: 0,
+  peek: 0,
+  chaos: 0,
+  shield: 0,
+  counter: 0,
+  mirror: 0,
+  gamble: 0,
+  smallGain: 12,
+  promiseTax: 12,
+  favor: 12,
+  consensus: 12,
+  slip: 6,
+  evenOmen: 6
+};
+
+export const PUBLIC_CARD_RESOLVE_ORDER: CardType[] = ['peek', 'chaos', 'smallGain', 'promiseTax', 'consensus', 'slip'];
+export const HIDDEN_CARD_RESOLVE_ORDER: CardType[] = ['shield', 'counter', 'mirror', 'gamble', 'favor', 'evenOmen'];
 
 export const BASE_JUDGMENT_DELTAS = {
   allAlliance: 2,
@@ -60,6 +88,21 @@ export const COMMITMENT_DELTAS = {
 export const FATE_DELTAS = {
   hit: 2,
   miss: -1
+} as const;
+
+export const GAMBLE_DELTAS = {
+  hit: 4,
+  miss: -2
+} as const;
+
+export const EXPEDIENCY_DELTAS = {
+  smallGain: 1,
+  promiseTax: -1,
+  favor: 1,
+  consensusHit: 1,
+  consensusMiss: -1,
+  slip: -1,
+  evenOmenMiss: -1
 } as const;
 
 export const COUNTER_TARGET_DELTA = -1;
@@ -118,13 +161,22 @@ export const BOT_WEIGHTS: Record<BotPersonality, {
 export const CARD_LABELS: Record<CardType, string> = {
   fate: '宿命',
   peek: '真理之眼',
+  chaos: '混沌',
   shield: '庇護',
-  counter: '反擊'
+  counter: '反擊',
+  mirror: '鏡像',
+  gamble: '賭命',
+  smallGain: '撿角',
+  promiseTax: '信任萬萬稅',
+  favor: '人情籌碼',
+  consensus: '共識',
+  slip: '手滑',
+  evenOmen: '雙數玄學'
 };
 
 export const FACTION_LABELS = {
-  alliance: '合作',
-  betrayal: '背叛'
+  alliance: '盟約',
+  betrayal: '叛離'
 } as const;
 
 export const PHASE_LABELS: Record<RoundPhase, string> = {
@@ -135,7 +187,7 @@ export const PHASE_LABELS: Record<RoundPhase, string> = {
   resolvePublicCards: '公開型功能牌觸發',
   reveal: '揭示階段',
   resolveJudgment: '裁決點數結算',
-  drawCards: '補牌階段',
+  drawCards: '抽牌階段',
   roundEnd: '回合結束',
   gameEnd: '遊戲結束'
 };

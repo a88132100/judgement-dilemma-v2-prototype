@@ -71,7 +71,7 @@ export function RoundSummaryPanel({ gameState }: RoundSummaryPanelProps) {
     <section className="panel round-summary-panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">Round Summary</span>
+          <span className="eyebrow">回合戰報</span>
           <h2>第 {result.round} 回合結算摘要</h2>
         </div>
         <div className="summary-situation">
@@ -94,6 +94,8 @@ export function RoundSummaryPanel({ gameState }: RoundSummaryPanelProps) {
               <th>宿命</th>
               <th>庇護</th>
               <th>反擊</th>
+              <th>鏡像</th>
+              <th>賭命</th>
               <th>守諾 / 失信</th>
               <th>本回合</th>
               <th>結算後</th>
@@ -105,7 +107,10 @@ export function RoundSummaryPanel({ gameState }: RoundSummaryPanelProps) {
               const fateDelta = valueOf(result.fateDeltaByPlayerId, player.id);
               const shieldDelta = valueOf(result.shieldDeltaByPlayerId, player.id);
               const counterDelta = valueOf(result.counterDeltaByPlayerId, player.id);
-              const cardDelta = fateDelta + shieldDelta + counterDelta;
+              const mirrorDelta = valueOf(result.mirrorDeltaByPlayerId, player.id);
+              const gambleDelta = valueOf(result.gambleDeltaByPlayerId, player.id);
+              const expediencyDelta = valueOf(result.expediencyDeltaByPlayerId, player.id);
+              const cardDelta = fateDelta + shieldDelta + counterDelta + mirrorDelta + gambleDelta + expediencyDelta;
               const commitmentDelta = valueOf(result.commitmentDeltaByPlayerId, player.id);
               const finalDelta = valueOf(result.finalDeltaByPlayerId, player.id);
 
@@ -119,7 +124,9 @@ export function RoundSummaryPanel({ gameState }: RoundSummaryPanelProps) {
                   <td>{signed(fateDelta)}</td>
                   <td>{signed(shieldDelta)}</td>
                   <td>{signed(counterDelta)}</td>
-                  <td>{commitmentDelta >= 0 ? `守諾 ${signed(commitmentDelta)}` : `失信 ${signed(commitmentDelta)}`}</td>
+                  <td>{signed(mirrorDelta)}</td>
+                  <td>{signed(gambleDelta)}</td>
+                  <td>{commitmentDelta === 0 ? `混沌豁免 ${signed(commitmentDelta)}` : commitmentDelta > 0 ? `守諾 ${signed(commitmentDelta)}` : `失信 ${signed(commitmentDelta)}`}</td>
                   <td className={finalDelta >= 0 ? 'positive-delta' : 'negative-delta'}>{signed(finalDelta)}</td>
                   <td>{player.judgmentPoints} 點</td>
                 </tr>

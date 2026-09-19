@@ -1,0 +1,250 @@
+/* 對局前入口沿用審判庭場景，保留自然頁高與原本的操作流程。 */
+.entry-shell:is(.title-screen, .opponent-select-screen, .tutorial-screen) {
+  --lobby-gold: #cfb578;
+  --lobby-ink: #f0e6cf;
+  --lobby-muted: #b8b3a2;
+  min-height: 100dvh;
+  height: auto;
+  color: var(--lobby-ink);
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+  background: linear-gradient(180deg, #080d10a8, #080d1052 46%, #060a0ce6), url('../assets/backgrounds/bg_tribunal_board_v3.png') center / cover no-repeat, #090e10;
+  overflow-x: clip;
+  padding: clamp(24px, 4vw, 60px);
+}
+.entry-shell:is(.title-screen, .opponent-select-screen, .tutorial-screen) :is(button, summary):focus-visible {
+  outline: 2px solid #ace2ee;
+  outline-offset: 5px;
+}
+.entry-shell :is(.entry-primary-button, .secondary-button, .confirm-button) {
+  border-radius: 2px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+.entry-shell :is(.entry-primary-button, .confirm-button) {
+  background: linear-gradient(180deg, #e7cc94, #b9985c);
+  border: 1px solid #f4daa4;
+  color: #211a10;
+  box-shadow: inset 0 0 0 3px #59452233, 0 8px 28px #0006;
+  min-height: 50px;
+  padding: 12px 30px;
+}
+.entry-shell .entry-primary-button::before,
+.entry-shell .entry-primary-button::after { content: none; }
+.entry-shell .secondary-button {
+  background: #0d171bde;
+  border: 1px solid #8a7956;
+  color: #e2d3b3;
+  box-shadow: none;
+  min-height: 42px;
+}
+.entry-shell button:hover:not(:disabled) { filter: none; border-color: #f5ddab; }
+.entry-shell :is(.entry-primary-button, .confirm-button):hover:not(:disabled) { background: linear-gradient(180deg, #f8deb0, #c9a668); transform: translateY(-2px); }
+.entry-shell button:disabled { opacity: .38; cursor: not-allowed; }
+.entry-shell .eyebrow { display: none; }
+
+/* 主選單像置身審判庭的開場，不放資訊卡片。 */
+.entry-shell.title-screen {
+  display: grid;
+  align-items: center;
+  justify-items: center;
+  background: linear-gradient(180deg, #080d103d, #080d105e 50%, #05080bbd), url('../assets/backgrounds/bg_tribunal_board_v3.png') center / cover no-repeat, #090e10;
+  overflow-y: visible;
+  position: relative;
+  isolation: isolate;
+}
+.title-screen::before { content: none; }
+.title-screen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 45%, transparent 20%, #05090ac9 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+.title-screen .entry-hero.game-title-menu {
+  display: grid;
+  justify-items: center;
+  align-items: center;
+  gap: 22px;
+  width: 100%;
+  max-width: 780px;
+  margin: 0;
+  padding: 34px 0;
+  text-align: center;
+}
+.title-screen .entry-hero h1 {
+  display: block;
+  font-family: "PMingLiU", "Songti TC", serif;
+  font-size: clamp(52px, 8.4vw, 118px);
+  font-weight: 500;
+  line-height: 1.15;
+  letter-spacing: .12em;
+  color: #ecd5a4;
+  filter: none;
+  margin: 0 0 4px .12em;
+  text-shadow: 0 2px 1px #8b6c3f, 0 8px 30px #000e;
+}
+.title-screen .entry-hero h1::before { content: none; }
+.title-screen .entry-hero h1::after {
+  content: '';
+  position: absolute;
+  height: 1px;
+  width: 76%;
+  bottom: -10px;
+  left: 12%;
+  background: linear-gradient(90deg, transparent, #c8a96b, transparent);
+}
+.title-screen .entry-hero > p {
+  margin: 0;
+  color: #dfc99e;
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: .38em;
+  text-shadow: 0 2px 12px #000;
+}
+.title-screen .entry-hero > p.entry-tutorial-hint {
+  order: 3;
+  font-size: 12px;
+  line-height: 1.8;
+  letter-spacing: .06em;
+  color: #c0baab;
+  max-width: 310px;
+}
+.title-screen .title-menu-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  width: min(290px, 84vw);
+  margin: 30px 0 0;
+}
+.title-screen .entry-primary-button { min-width: 0; width: 100%; min-height: 58px; font-size: 20px; letter-spacing: .25em; }
+.title-screen .entry-secondary-button { min-height: 48px; width: 100%; font-size: 15px; letter-spacing: .2em; }
+.title-screen .entry-rule-card {
+  order: 4;
+  width: min(400px, 90vw);
+  max-width: 100%;
+  margin: 0;
+  padding: 8px 16px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--lobby-muted);
+  font-size: 13px;
+}
+.title-screen .entry-rule-card summary { cursor: pointer; color: #cbb787; font-size: 13px; letter-spacing: .12em; }
+.title-screen .entry-rule-card[open] { background: #091114e6; }
+.title-screen .entry-rule-card ul { text-align: left; line-height: 1.9; margin: 14px 0 6px; padding-left: 22px; }
+
+/* 六名角色以直立牌面排開，金色邊緣標記本局受邀者。 */
+.entry-shell.opponent-select-screen { align-items: center; padding-block: 32px; }
+.opponent-select-screen .opponent-select-panel {
+  display: grid;
+  width: 100%;
+  max-width: 1500px;
+  gap: 26px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+.opponent-select-screen .entry-panel-heading { display: flex; align-items: start; justify-content: space-between; gap: 24px; }
+.opponent-select-screen .entry-panel-heading h1 { font-family: "PMingLiU", "Songti TC", serif; font-size: clamp(34px, 3.4vw, 52px); font-weight: 500; letter-spacing: .14em; margin: 0; color: #eed8ac; }
+.opponent-select-screen .entry-panel-heading p { color: #c3beaf; font-size: 13px; line-height: 1.8; margin-top: 10px; max-width: 750px; }
+.opponent-select-screen .entry-panel-heading .opponent-select-count { color: #edd098; font-size: 15px; letter-spacing: .12em; margin-top: 12px; }
+.opponent-select-screen .opponent-card-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 14px; }
+.opponent-select-screen .opponent-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 12px;
+  background: linear-gradient(180deg, #122027eb, #0a1116f5 75%);
+  border: 1px solid #60553f;
+  border-radius: 2px;
+  box-shadow: 0 16px 35px #0007;
+  overflow: hidden;
+  transition: border-color .18s ease, transform .18s ease;
+}
+.opponent-select-screen .opponent-card::before { content: none; }
+.opponent-select-screen .opponent-card.is-selected { border-color: #e2c487; box-shadow: 0 0 0 1px #bd9c58, 0 14px 34px #000a; transform: translateY(-4px); }
+.opponent-select-screen .opponent-card.is-selected::after { content: '◆'; position: absolute; top: 10px; right: 10px; z-index: 3; color: #f0d596; text-shadow: 0 1px 8px #000; font-size: 20px; }
+.opponent-select-screen .opponent-profile {
+  display: block;
+  flex-shrink: 0;
+  position: relative;
+  width: calc(100% + 24px);
+  height: clamp(190px, 18.5vw, 285px);
+  max-height: none;
+  margin: -12px -12px 2px;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  background: #0a1215;
+  box-shadow: none;
+  overflow: hidden;
+}
+.opponent-select-screen .opponent-profile::after { content: ''; position: absolute; z-index: 2; inset: 0; background: linear-gradient(180deg, transparent 60%, #101b21); pointer-events: none; }
+.opponent-select-screen .opponent-profile img { display: block; position: relative; width: 100%; height: 100%; object-fit: cover; object-position: 50% 22%; filter: saturate(.74); }
+.opponent-select-screen .opponent-title { font-size: 11px; font-weight: 400; color: #c5ac78; }
+.opponent-select-screen .opponent-card h2 { font-family: "PMingLiU", "Songti TC", serif; font-size: clamp(17px, 1.45vw, 22px); font-weight: 500; line-height: 1.4; color: #f2dfbc; margin: 3px 0 0; }
+.opponent-select-screen .opponent-card > p { margin: 0; font-size: 12px; line-height: 1.7; color: #bdbbad; }
+.opponent-select-screen .opponent-card-footer { display: flex; align-items: stretch; flex-direction: column; gap: 12px; margin-top: auto; padding-top: 8px; }
+.opponent-select-screen .opponent-personality-tag { font-size: 11px; line-height: 1.7; color: #c4bca7; }
+.opponent-select-screen .opponent-select-toggle { width: 100%; min-height: 36px; font-size: 12px; border-color: #746449; }
+.opponent-select-screen .is-selected .opponent-select-toggle { color: #efd19a; border-color: #a88d54; background: #302819; }
+.opponent-select-screen .entry-actions.align-end { display: flex; justify-content: center; margin: 0; }
+.opponent-select-screen .entry-actions .entry-primary-button { width: 290px; min-width: 270px; font-size: 18px; }
+
+/* 教學保留步驟與學習資訊，以較輕的分隔線整理閱讀層級。 */
+.entry-shell.tutorial-screen { align-items: start; background-attachment: fixed; }
+.tutorial-screen .tutorial-shell { max-width: 1260px; gap: 24px; }
+.tutorial-screen :is(.tutorial-header, .tutorial-overlay-card, .tutorial-main-panel, .tutorial-mini-panel) { border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
+.tutorial-screen .tutorial-header { background: transparent; padding: 0 0 14px; border-bottom: 1px solid #a68b544d; }
+.tutorial-screen .tutorial-header h1 { font-family: "PMingLiU", "Songti TC", serif; font-size: 40px; font-weight: 500; letter-spacing: .12em; color: #ecd5a4; }
+.tutorial-screen .tutorial-overlay-card { background: #0b141bcf; border-left: 2px solid #ccb47e; padding: 18px 24px; gap: 9px; }
+.tutorial-screen .tutorial-overlay-card h2 { font-size: 24px; font-weight: 500; color: #ead4ac; }
+.tutorial-screen .tutorial-overlay-card p { line-height: 1.85; color: #cfcbbe; }
+.tutorial-screen .tutorial-layout { gap: 24px; grid-template-columns: minmax(0, 1fr) 290px; }
+.tutorial-screen .tutorial-main-panel { min-height: 380px; padding: 24px; background: #091319bd; border-top: 1px solid #806b424d; }
+.tutorial-screen .tutorial-mini-panel { background: #0b141cd9; padding: 18px; }
+.tutorial-screen .tutorial-mini-panel h2 { font-size: 15px; font-weight: 500; color: #d9c59c; padding-bottom: 12px; }
+.tutorial-screen .tutorial-player-card { border-color: #77674855; border-radius: 2px; background: #111d22; }
+.tutorial-screen .tutorial-focus.is-tutorial-highlight { border: 0; border-radius: 0; box-shadow: none; padding: 0; }
+.tutorial-screen .tutorial-choice-row { justify-content: center; gap: 22px; }
+.tutorial-screen :is(.tutorial-token-button, .tutorial-card-button) { border-radius: 2px; border-color: #ab9055; background: #121d23; }
+.tutorial-screen .tutorial-actions { padding-top: 16px; }
+
+@media (min-width: 1600px) {
+  .opponent-select-screen .opponent-card { padding: 16px; }
+  .opponent-select-screen .opponent-profile { width: calc(100% + 32px); margin: -16px -16px 2px; }
+  .opponent-select-screen .opponent-card > p { font-size: 13px; }
+}
+@media (max-width: 1100px) {
+  .opponent-select-screen .opponent-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 18px; }
+  .opponent-select-screen .opponent-profile { height: 265px; }
+  .opponent-select-screen .opponent-card h2 { font-size: 23px; }
+  .opponent-select-screen .opponent-card > p { font-size: 13px; }
+}
+@media (max-width: 760px) {
+  .entry-shell:is(.title-screen, .opponent-select-screen, .tutorial-screen) { padding: 24px 18px; }
+  .opponent-select-screen .entry-panel-heading { flex-direction: column; gap: 16px; }
+  .opponent-select-screen .opponent-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 12px; }
+  .opponent-select-screen .opponent-profile { height: clamp(190px, 44vw, 285px); }
+  .opponent-select-screen .opponent-card h2 { font-size: 18px; }
+  .opponent-select-screen .opponent-card > p { font-size: 12px; }
+  .opponent-select-screen .entry-actions .entry-primary-button { min-width: 240px; }
+  .tutorial-screen .tutorial-layout { grid-template-columns: minmax(0, 1fr); }
+  .tutorial-screen .tutorial-main-panel { padding: 18px; min-height: 260px; }
+  .tutorial-screen .tutorial-header h1 { font-size: 30px; }
+  .tutorial-screen .tutorial-overlay-card { padding: 16px; }
+  .tutorial-screen .tutorial-side-panel { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .entry-shell :is(button, .opponent-card) { transition: none; }
+}

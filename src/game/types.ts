@@ -12,9 +12,29 @@ export type RoundPhase =
   | 'roundEnd'
   | 'gameEnd';
 
-export type CardType = 'fate' | 'peek' | 'shield' | 'counter';
+export type CardType =
+  | 'fate'
+  | 'peek'
+  | 'chaos'
+  | 'smallGain'
+  | 'promiseTax'
+  | 'consensus'
+  | 'slip'
+  | 'shield'
+  | 'counter'
+  | 'mirror'
+  | 'gamble'
+  | 'favor'
+  | 'evenOmen';
 export type FunctionCardSelection = CardType | 'blank';
 export type BotPersonality = 'honest' | 'opportunist' | 'observer';
+export type BotProfileId =
+  | 'oathkeeper_balanced'
+  | 'oathkeeper_cautious'
+  | 'opportunist_calculated'
+  | 'opportunist_risky'
+  | 'observer_balanced'
+  | 'observer_suspicious';
 
 export type FatePrediction =
   | {
@@ -38,8 +58,15 @@ export interface PlayedCard {
 export interface PlayerState {
   id: string;
   name: string;
+  displayName?: string;
   isHuman: boolean;
+  opponentId?: string;
+  opponentTitle?: string;
+  avatar?: string;
+  seat?: string;
+  profile?: string;
   botPersonality?: BotPersonality;
+  botProfileId?: BotProfileId;
   judgmentPoints: number;
   isEliminated: boolean;
   commitment?: Faction;
@@ -54,7 +81,13 @@ export interface PlayerState {
   hasDeclaredFate?: boolean;
   hasResolvedFate?: boolean;
   hasResolvedPeek?: boolean;
+  hasResolvedChaos?: boolean;
   hasChangedFactionByPeek?: boolean;
+  chaosTargetedThisRound?: boolean;
+  disabledFunctionCardThisRound?: boolean;
+  hasUsedGambleThisGame?: boolean;
+  skipNextDraw?: boolean;
+  bonusDrawsNextDrawPhase?: number;
 }
 
 export type RoundResultType =
@@ -75,6 +108,13 @@ export interface RoundSituation {
   resultType: RoundResultType;
 }
 
+export interface RoundCardReportEntry {
+  playerId: string;
+  cardType: CardType;
+  summary: string;
+  targetPlayerId?: string;
+}
+
 export interface RoundResult {
   round: number;
   situation: RoundSituation;
@@ -82,11 +122,15 @@ export interface RoundResult {
   adjustedBaseDeltaByPlayerId: Record<string, number>;
   shieldDeltaByPlayerId: Record<string, number>;
   counterDeltaByPlayerId: Record<string, number>;
+  mirrorDeltaByPlayerId: Record<string, number>;
   fateDeltaByPlayerId: Record<string, number>;
+  gambleDeltaByPlayerId: Record<string, number>;
+  expediencyDeltaByPlayerId: Record<string, number>;
   commitmentDeltaByPlayerId: Record<string, number>;
   finalDeltaByPlayerId: Record<string, number>;
   revealedFactionsByPlayerId: Record<string, Faction>;
   summary: string;
+  cardReport?: RoundCardReportEntry[];
 }
 
 export interface GameState {

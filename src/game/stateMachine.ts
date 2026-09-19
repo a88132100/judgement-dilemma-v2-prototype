@@ -1,17 +1,23 @@
-import { DRAW_CARDS_PER_ROUND, FACTION_LABELS, MVP_CARD_TYPES } from './constants';
+import { DRAW_CARDS_PER_ROUND, FACTION_LABELS, IMPLEMENTED_CARD_TYPES } from './constants';
 import {
+  applyChaosEffects,
   applyCounterCards,
+  applyMirrorCards,
   applyShieldCards,
   describeCardResolution,
+  hasPendingHumanChaosResolution,
   hasPendingHumanPeekResolution,
   resolveFateCards,
+  resolveExpediencyCards,
+  resolveGambleCards,
   resolvePublicCards
 } from './cardResolver';
-import { canUseCardWithFaction } from './cardRules';
+import { canUseCardWithFaction, isPublicFunctionCard } from './cardRules';
 import { decideBotCardPlay, decideBotCommitment, decideBotFateDeclaration, decideBotFinalFaction } from './botDecision';
 import { drawCards, ensureDeck } from './deck';
 import { cardLabel, factionLabel } from './log';
 import { BASELINE_RULES_CONFIG, type RulesConfig } from './rulesConfig';
+import { buildRoundCardReport } from './roundCardReport';
 import {
   applyRoundResult,
   buildFinalRoundResult,
@@ -45,7 +51,8 @@ function withPlayedCard(player: PlayerState, playedCard?: PlayedCard): PlayerSta
     hand: removeOneCard(player.hand, playedCard.type),
     playedCard,
     functionCardSelection: playedCard.type,
-    hasPlayedCardThisRound: true
+    hasPlayedCardThisRound: true,
+    hasUsedGambleThisGame: playedCard.type === 'gamble' ? true : player.hasUsedGambleThisGame
   };
 }
 
@@ -91,7 +98,11 @@ function resetRoundPlayer(player: PlayerState): PlayerState {
     hasDeclaredFate: undefined,
     hasResolvedFate: undefined,
     hasResolvedPeek: undefined,
-    hasChangedFactionByPeek: undefined
+    hasResolvedChaos: undefined,
+    hasChangedFactionByPeek: undefined,
+    chaosTargetedThisRound: undefined,
+    disabledFunctionCardThisRound: undefined,
+    bonusDrawsNextDrawPhase: undefined
   };
 }
 
@@ -115,8 +126,8 @@ export function validateHumanPlay(state: GameState, input: HumanPlayInput): stri
   if (input.card.type === 'fate') {
     return '操作無效：宿命只能在宿命宣告階段使用。';
   }
-  if (!MVP_CARD_TYPES.includes(input.card.type)) {
-    return '操作無效：功能牌不屬於第一版 MVP 牌組。';
+  if (!IMPLEMENTED_CARD_TYPES.includes(input.card.type)) {
+    return '操作無效：功能牌不屬於目前規則池。';
   }
   if (!human.hand.includes(input.card.type)) {
     return `操作無效：你的手牌中沒有 ${cardLabel(input.card.type)}。`;
@@ -124,8 +135,11 @@ export function validateHumanPlay(state: GameState, input: HumanPlayInput): stri
   if (human.hasPlayedCardThisRound || human.playedCard) {
     return '操作無效：每回合最多只能使用 1 張功能牌。';
   }
+  if (input.card.type === 'gamble' && human.hasUsedGambleThisGame) {
+    return '操作無效：每位玩家每場遊戲最多只能使用 1 次賭命。';
+  }
   if (!canUseCardWithFaction(input.card.type, input.chosenFaction)) {
-    return `操作無效：${cardLabel(input.card.type)} 只能搭配合作陣營使用。`;
+    return `操作無效：${cardLabel(input.card.type)} 不能搭配${factionLabel(input.chosenFaction)}陣營使用。`;
   }
   const target = input.card.targetPlayerId ? state.players.find((player) => player.id === input.card?.targetPlayerId) : undefined;
   if (input.card.type === 'peek' && input.card.targetPlayerId) {
@@ -186,6 +200,63 @@ export function submitHumanCommitment(state: GameState, commitment: PlayerState[
   };
 }
 
+function completeBotFateDeclaration(state: GameState, player: PlayerState, eventLog: string[], rng: () => number): PlayerState {
+  const playedCard = decideBotFateDeclaration(state, player, rng);
+  if (!playedCard?.fatePrediction) {
+    return { ...player, hasResolvedFateDeclaration: true };
+  }
+  eventLog.push(`${player.name} 使用 ${cardLabel('fate')}，預言：${describeFatePrediction(playedCard.fatePrediction, state.players)}。`);
+  return {
+    ...player,
+    hand: removeOneCard(player.hand, 'fate'),
+    playedCard,
+    functionCardSelection: 'fate',
+    hasPlayedCardThisRound: true,
+    hasResolvedFateDeclaration: true,
+    hasDeclaredFate: true
+  };
+}
+
+function completeBotPlay(state: GameState, player: PlayerState, rng: () => number): PlayerState {
+  const botFaction = decideBotFinalFaction(state, player, rng);
+  const playedCard = decideBotCardPlay(state, player, rng, botFaction);
+  const legalPlayedCard =
+    playedCard && canUseCardWithFaction(playedCard.type, botFaction) && (playedCard.type !== 'gamble' || !player.hasUsedGambleThisGame)
+      ? playedCard
+      : undefined;
+  return withPlayedCard({ ...player, chosenFaction: botFaction, judgedFaction: botFaction }, legalPlayedCard);
+}
+
+// 真人出局後只補齊尚未完成的 Bot 決定；重複呼叫不會重新抽取策略或使用手牌。
+export function completeEliminatedHumanTurn(state: GameState, rng: () => number = Math.random): GameState {
+  if (state.gameOverReason || state.players.some((player) => player.isHuman && !player.isEliminated)) {
+    return state;
+  }
+  const eventLog = [...state.eventLog];
+  let changed = false;
+  const players = state.players.map((player) => {
+    if (player.isHuman || player.isEliminated) {
+      return player;
+    }
+    if (state.phase === 'commitment' && !player.commitment) {
+      changed = true;
+      const commitment = decideBotCommitment(player, rng);
+      eventLog.push(`${player.name} 承諾選擇${factionLabel(commitment)}。`);
+      return { ...player, commitment };
+    }
+    if (state.phase === 'fateDeclare' && !player.hasResolvedFateDeclaration) {
+      changed = true;
+      return completeBotFateDeclaration(state, player, eventLog, rng);
+    }
+    if (state.phase === 'playCards' && !player.judgedFaction) {
+      changed = true;
+      return completeBotPlay(state, player, rng);
+    }
+    return player;
+  });
+  return changed ? { ...state, players, eventLog } : state;
+}
+
 export function submitHumanFateDeclaration(
   state: GameState,
   input: HumanFateDeclarationInput,
@@ -227,20 +298,7 @@ export function submitHumanFateDeclaration(
       };
     }
 
-    const playedCard = decideBotFateDeclaration(state, player, rng);
-    if (!playedCard?.fatePrediction) {
-      return { ...player, hasResolvedFateDeclaration: true };
-    }
-    eventLog.push(`${player.name} 使用 ${cardLabel('fate')}，預言：${describeFatePrediction(playedCard.fatePrediction, state.players)}。`);
-    return {
-      ...player,
-      hand: removeOneCard(player.hand, 'fate'),
-      playedCard,
-      functionCardSelection: 'fate' as const,
-      hasPlayedCardThisRound: true,
-      hasResolvedFateDeclaration: true,
-      hasDeclaredFate: true
-    };
+    return completeBotFateDeclaration(state, player, eventLog, rng);
   });
 
   return {
@@ -269,15 +327,12 @@ export function completeHumanPlay(state: GameState, input: HumanPlayInput, rng: 
             userPlayerId: player.id,
             targetPlayerId: input.card.targetPlayerId,
             fatePrediction: input.card.fatePrediction,
-            isPublic: input.card.type === 'peek'
+            isPublic: isPublicFunctionCard(input.card.type)
           }
         : undefined;
       return withPlayedCard({ ...player, chosenFaction: input.chosenFaction, judgedFaction: input.chosenFaction }, playedCard);
     }
-    const botFaction = decideBotFinalFaction(state, player, rng);
-    const playedCard = decideBotCardPlay(state, player, rng);
-    const legalPlayedCard = playedCard && canUseCardWithFaction(playedCard.type, botFaction) ? playedCard : undefined;
-    return withPlayedCard({ ...player, chosenFaction: botFaction, judgedFaction: botFaction }, legalPlayedCard);
+    return completeBotPlay(state, player, rng);
   });
   return {
     ...state,
@@ -295,42 +350,72 @@ export function executeRoundJudgment(
   rng: () => number = Math.random,
   rulesConfig: RulesConfig = BASELINE_RULES_CONFIG
 ): GameState {
-  const situation = getRoundSituation(state.players);
-  const baseDeltaByPlayerId = resolveBaseJudgment(state.players, situation, rulesConfig);
-  const { adjustedBaseDeltaByPlayerId, shieldDeltaByPlayerId } = applyShieldCards({
-    players: state.players,
+  const stateAfterChaos = applyChaosEffects(state);
+  const situation = getRoundSituation(stateAfterChaos.players);
+  const baseDeltaByPlayerId = resolveBaseJudgment(stateAfterChaos.players, situation, rulesConfig);
+  const shieldResult = applyShieldCards({
+    players: stateAfterChaos.players,
     situation,
     baseDeltaByPlayerId,
     rulesConfig
   });
-  const { counterDeltaByPlayerId, counterTargetByUserId } = applyCounterCards({ players: state.players, situation, rng, rulesConfig });
-  const fateDeltaByPlayerId = resolveFateCards({ players: state.players, situation, rulesConfig });
-  const commitmentDeltaByPlayerId = resolveCommitmentDelta(state.players, situation, rulesConfig);
+  const mirrorResult = applyMirrorCards({
+    players: stateAfterChaos.players,
+    situation,
+    adjustedBaseDeltaByPlayerId: shieldResult.adjustedBaseDeltaByPlayerId,
+    rng
+  });
+  const { counterDeltaByPlayerId, counterTargetByUserId } = applyCounterCards({ players: stateAfterChaos.players, situation, rng, rulesConfig });
+  const fateHitByPlayerId: Record<string, boolean> = {};
+  const fateDeltaByPlayerId = resolveFateCards({ players: stateAfterChaos.players, situation, rulesConfig, hitByPlayerId: fateHitByPlayerId });
+  const gambleResult = resolveGambleCards({ players: stateAfterChaos.players, situation, rng, rulesConfig });
+  const expediencyResult = resolveExpediencyCards({ players: gambleResult.players, situation, rng });
+  const stateAfterCardEffects = {
+    ...stateAfterChaos,
+    players: expediencyResult.players,
+    discardPile: [
+      ...stateAfterChaos.discardPile,
+      ...Object.values(gambleResult.gambleDiscardByPlayerId).filter((card): card is CardType => Boolean(card)),
+      ...Object.values(expediencyResult.expediencyDiscardByPlayerId).filter((card): card is CardType => Boolean(card))
+    ]
+  };
+  const commitmentDeltaByPlayerId = resolveCommitmentDelta(stateAfterCardEffects.players, situation, rulesConfig);
   const result = buildFinalRoundResult({
-    state,
+    state: stateAfterCardEffects,
     situation,
     baseDeltaByPlayerId,
-    adjustedBaseDeltaByPlayerId,
-    shieldDeltaByPlayerId,
+    adjustedBaseDeltaByPlayerId: mirrorResult.adjustedBaseDeltaByPlayerId,
+    shieldDeltaByPlayerId: shieldResult.shieldDeltaByPlayerId,
     counterDeltaByPlayerId,
+    mirrorDeltaByPlayerId: mirrorResult.mirrorDeltaByPlayerId,
     fateDeltaByPlayerId,
+    gambleDeltaByPlayerId: gambleResult.gambleDeltaByPlayerId,
+    expediencyDeltaByPlayerId: expediencyResult.expediencyDeltaByPlayerId,
     commitmentDeltaByPlayerId
   });
-  const stateWithCardNotes = {
-    ...state,
-    eventLog: [
-      ...state.eventLog,
-      ...describeCardResolution({
-        state,
+  const resolutionNotes = {
+        state: stateAfterCardEffects,
         situation,
         baseDeltaByPlayerId,
-        adjustedBaseDeltaByPlayerId,
-        shieldDeltaByPlayerId,
+        adjustedBaseDeltaByPlayerId: mirrorResult.adjustedBaseDeltaByPlayerId,
+        shieldDeltaByPlayerId: shieldResult.shieldDeltaByPlayerId,
         counterTargetByUserId,
+        mirrorTargetByUserId: mirrorResult.mirrorTargetByUserId,
+        mirrorSuccessByUserId: mirrorResult.mirrorSuccessByUserId,
         fateDeltaByPlayerId,
+        gambleDeltaByPlayerId: gambleResult.gambleDeltaByPlayerId,
+        gambleDiscardByPlayerId: gambleResult.gambleDiscardByPlayerId,
+        expediencyDeltaByPlayerId: expediencyResult.expediencyDeltaByPlayerId,
+        expediencyDrawBonusByPlayerId: expediencyResult.expediencyDrawBonusByPlayerId,
+        expediencyDiscardByPlayerId: expediencyResult.expediencyDiscardByPlayerId,
+        promiseTaxTargetByUserId: expediencyResult.promiseTaxTargetByUserId,
+        favorTargetByUserId: expediencyResult.favorTargetByUserId,
         rulesConfig
-      })
-    ]
+  };
+  result.cardReport = buildRoundCardReport({ ...resolutionNotes, fateHitByPlayerId, gambleSuccessByPlayerId: gambleResult.gambleSuccessByPlayerId });
+  const stateWithCardNotes = {
+    ...stateAfterCardEffects,
+    eventLog: [...stateAfterCardEffects.eventLog, ...describeCardResolution(resolutionNotes)]
   };
   const resolved = applyRoundResult(stateWithCardNotes, result, rulesConfig);
   return {
@@ -339,21 +424,59 @@ export function executeRoundJudgment(
   };
 }
 
+function drawAvailableCards(args: {
+  deck: CardType[];
+  discardPile: CardType[];
+  count: number;
+  rng: () => number;
+}): {
+  deck: CardType[];
+  discardPile: CardType[];
+  drawn: CardType[];
+} {
+  let deck = args.deck;
+  let discardPile = args.discardPile;
+  const drawn: CardType[] = [];
+
+  for (let index = 0; index < args.count; index += 1) {
+    const ensured = ensureDeck(deck, discardPile, args.rng);
+    deck = ensured.deck;
+    discardPile = ensured.discardPile;
+    if (deck.length === 0) {
+      break;
+    }
+    const drawResult = drawCards(deck, 1);
+    deck = drawResult.deck;
+    drawn.push(...drawResult.drawn);
+  }
+
+  return { deck, discardPile, drawn };
+}
+
 function drawForPlayers(state: GameState, rng: () => number = Math.random, rulesConfig: RulesConfig = BASELINE_RULES_CONFIG): GameState {
   let deck = state.deck;
   let discardPile = state.discardPile;
   const eventLog = [...state.eventLog];
   const players = state.players.map((player) => {
-    if (player.isEliminated || player.hand.length >= rulesConfig.handLimit) {
+    if (player.isEliminated) {
       return player;
     }
-    const ensured = ensureDeck(deck, discardPile, rng);
-    deck = ensured.deck;
-    discardPile = ensured.discardPile;
-    const drawResult = drawCards(deck, DRAW_CARDS_PER_ROUND);
+    if (player.skipNextDraw) {
+      eventLog.push(`${player.name} 因賭命失敗，本次跳過補牌。`);
+      return { ...player, skipNextDraw: false, bonusDrawsNextDrawPhase: undefined };
+    }
+    const availableSlots = Math.max(0, rulesConfig.handLimit - player.hand.length);
+    const bonusDraws = player.bonusDrawsNextDrawPhase ?? 0;
+    const drawCount = Math.min(DRAW_CARDS_PER_ROUND + bonusDraws, availableSlots);
+    if (drawCount <= 0) {
+      return { ...player, bonusDrawsNextDrawPhase: undefined };
+    }
+    const drawResult = drawAvailableCards({ deck, discardPile, count: drawCount, rng });
     deck = drawResult.deck;
-    eventLog.push(`${player.name} 補 ${DRAW_CARDS_PER_ROUND} 張功能牌。`);
-    return { ...player, hand: [...player.hand, ...drawResult.drawn] };
+    discardPile = drawResult.discardPile;
+    const bonusText = bonusDraws > 0 ? '（含權宜牌額外補牌）' : '';
+    eventLog.push(`${player.name} 補 ${drawResult.drawn.length} 張功能牌${bonusText}。`);
+    return { ...player, hand: [...player.hand, ...drawResult.drawn], bonusDrawsNextDrawPhase: undefined };
   });
   return { ...state, players, deck, discardPile, eventLog };
 }
@@ -416,6 +539,9 @@ export function advancePhase(
   if (state.phase === 'resolvePublicCards') {
     if (hasPendingHumanPeekResolution(state)) {
       return { ...state, eventLog: [...state.eventLog, '請先完成真理之眼指定與是否更換陣營的選擇。'] };
+    }
+    if (hasPendingHumanChaosResolution(state)) {
+      return { ...state, eventLog: [...state.eventLog, '請先完成混沌指定目標。'] };
     }
     return { ...resolvePublicCards(state, rulesConfig, rng), phase: 'reveal' };
   }

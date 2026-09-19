@@ -1,0 +1,4 @@
+/* 舊入口與教學保留原樣式；對局可透過獨立層完整接管。 */
+@import url('./global.css') layer(legacy);
+@import url('./layout.css') layer(legacy);
+@import url('./components.css') layer(legacy);

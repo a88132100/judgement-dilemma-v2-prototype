@@ -14,19 +14,22 @@ The goal is to validate:
 
 This is not a final commercial product.
 
-## Codex Game Studio Skill
+## Game Studio Skill
 
-For game design, prototype implementation, QA, balancing, playtest, or release-prep work in this repo, use the `codex-game-studio` skill.
+For game design, prototype implementation, debugging, QA, balancing, playtest, polish, or release-prep work in this repo, use the `gamestudio` skill as the default full-game workflow.
 
-Apply it as a compact studio workflow:
-- Orient: identify the current prototype stage and relevant system.
-- Frame: ask only blocking questions; otherwise make conservative assumptions.
-- Execute: edit the needed code, docs, tests, or prototype content.
-- Verify: run relevant tests, builds, smoke checks, or browser playtests when applicable.
+Apply its required workflow:
+- Identify the current phase and choose only the studio roles relevant to the task.
+- Read the relevant project files and handoff documents before editing.
+- Ask only blocking questions; otherwise state important assumptions and make conservative decisions.
+- Implement the smallest safe slice that solves the requested problem.
+- Run the most relevant tests, builds, smoke checks, or browser playtests.
+- Update `CODEX_HANDOFF.md` after substantial work or when continuity is requested.
+- If the same failure survives repeated fixes, follow the skill's debug handoff rule and stop further code edits until a testable root-cause hypothesis exists.
 
 Use lean review intensity by default because this is a rapid validation prototype. Use full review only for broad rule changes, release-facing work, or changes that affect multiple core systems.
 
-The game studio workflow must follow this project's MVP limits and rule-validation goal. Do not expand scope just because a studio artifact could exist.
+The `gamestudio` workflow must follow this project's MVP limits and rule-validation goal. Do not expand scope just because a studio role, artifact, or broader production workflow could exist.
 
 ## Tech Stack
 
@@ -70,7 +73,7 @@ The core resource is Judgment Points.
 
 Default values:
 - Starting Judgment Points: 6
-- Win at: 12
+- Win at: 11
 - Eliminated at: 0
 - Max rounds: 10
 
@@ -80,12 +83,13 @@ Each round follows:
 
 1. commitment
 2. discussion
-3. playCards
-4. resolvePublicCards
-5. reveal
-6. resolveJudgment
-7. drawCards
-8. roundEnd
+3. fateDeclare
+4. playCards
+5. resolvePublicCards
+6. reveal
+7. resolveJudgment
+8. drawCards
+9. roundEnd
 
 ## MVP Scope
 
@@ -104,6 +108,7 @@ First prototype includes:
 - Hand limit: 3
 - Draw 1 card at round end if hand size is below 3
 - Each player may use at most 1 function card per round
+- 宿命 uses the same one-function-card-per-round limit, but resolves in its own declaration phase.
 
 ## First MVP Cards
 
@@ -140,8 +145,11 @@ Important:
 
 Public cards in the first MVP:
 
+1. 真理之眼
+
+Independent declaration cards in the first MVP:
+
 1. 宿命
-2. 真理之眼
 
 Hidden cards in the first MVP:
 
@@ -150,10 +158,12 @@ Hidden cards in the first MVP:
 
 Full v2 order reserved for later:
 
-Public:
+Independent declaration:
 1. 宿命
-2. 真理之眼
-3. 混沌
+
+Public:
+1. 真理之眼
+2. 混沌
 
 Hidden:
 1. 庇護

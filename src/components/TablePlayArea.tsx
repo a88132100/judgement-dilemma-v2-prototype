@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { canUseCardWithFaction } from '../game/cardRules';
-import { getPeekTargetPlayers, getPublicCardResolvePlayers, resolvePeekChoice } from '../game/cardResolver';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { canUseCardWithFaction, cardRequirementText } from '../game/cardRules';
+import { getChaosTargetPlayers, getPeekTargetPlayers, getPublicCardResolvePlayers, resolveChaosChoice, resolvePeekChoice } from '../game/cardResolver';
 import { CARD_LABELS, FACTION_LABELS, PHASE_LABELS } from '../game/constants';
-import { buildScoreBreakdown } from '../game/scoreBreakdown';
+import { buildBotSpeech } from '../game/botSpeech';
 import {
-  advancePhase,
   completeHumanPlay,
   submitHumanCommitment,
   submitHumanFateDeclaration,
@@ -17,13 +16,17 @@ import { CardEffectOverlay } from './CardEffectOverlay';
 import { CardDetailPanel } from './CardDetailPanel';
 import type { CardDetailTarget } from './cardDetails';
 import { DraggableCard } from './DraggableCard';
-import { DropZone } from './DropZone';
-import { ScoreBreakdownPanel } from './ScoreBreakdownPanel';
+import { DropZone, type DropPoint } from './DropZone';
 import type { DragPayload } from './dragTypes';
+import { useCardCast } from './useCardCast';
+import { useRoundFlow } from './useRoundFlow';
+import { TribunalPlaque } from './TribunalPlaque';
+import { CommitmentTokenArt } from './CommitmentTokenArt';
 
 interface TablePlayAreaProps {
   gameState: GameState;
   onGameStateChange: (state: GameState) => void;
+  flowPaused?: boolean;
 }
 
 type FateKind = 'majority' | 'identity';
@@ -35,33 +38,24 @@ const factionLabels: Record<Faction, string> = {
   betrayal: '叛離'
 };
 
-const situationLabels = {
-  loneHero: '孤勇者',
-  allAlliance: '全員盟約',
-  allBetrayal: '全員叛離',
-  equal: '勢均力敵',
-  minorityBetrayal: '少數叛離',
-  betrayalOverload: '叛離過載'
-} as const;
-
-const phaseQuickHints: Record<RoundPhase, string> = {
-  commitment: '選擇你公開承諾的方向。守諾 +1，失信 -1。',
-  discussion: '你可以說服、威脅或誤導其他玩家。',
-  fateDeclare: '本回合最多使用 1 張功能牌，宿命會在此公開宣告。',
-  playCards: '選擇你真正要執行的陣營。這可以和承諾不同。',
-  resolvePublicCards: '本回合最多使用 1 張功能牌，公開型效果會在翻牌前處理。',
-  reveal: '翻開本回合陣營，並確認最終判定。',
-  resolveJudgment: '點擊玩家結果可查看加扣分明細。',
-  drawCards: '手牌未滿 3 張的玩家會補 1 張功能牌。',
-  roundEnd: '回合已完成，可查看摘要後推進下一回合。',
-  gameEnd: '遊戲已結束，請查看最終結果。'
-};
+// 用固定種子讓同一回合的 Bot 發言穩定，不因 React 重新渲染而跳句。
+function stableSpeechRng(seed: string): () => number {
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) >>> 0;
+  }
+  return () => (hash % 1000) / 1000;
+}
 
 function handLimitText(player: PlayerState): string {
   return `手牌 ${player.hand.length} / 3`;
 }
 
-export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaProps) {
+function choiceButtonClass(isSelected: boolean) {
+  return `stage-choice-button ${isSelected ? 'is-selected' : ''}`;
+}
+
+export function TablePlayArea({ gameState, onGameStateChange, flowPaused = false }: TablePlayAreaProps) {
   const human = gameState.players.find((player) => player.isHuman);
   const otherPlayers = useMemo(() => gameState.players.filter((player) => !player.isHuman && !player.isEliminated), [gameState.players]);
   const [commitment, setCommitment] = useState<Faction | ''>('');
@@ -77,8 +71,25 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
   const [confirmedPeekTargetId, setConfirmedPeekTargetId] = useState('');
   const [peekResultShown, setPeekResultShown] = useState(false);
   const handKey = human?.hand.join('|') ?? '';
+  const commitmentLandingRef = useRef<HTMLDivElement>(null);
+  const factionLandingRef = useRef<HTMLDivElement>(null);
+  const functionLandingRef = useRef<HTMLDivElement>(null);
+  const dragSourceRef = useRef<HTMLButtonElement | null>(null);
+  const { castCard, cancelCast } = useCardCast(gameState);
   const showReveal = revealPhases.has(gameState.phase);
-  const latestRoundResult = gameState.roundResults.at(-1);
+  const botSpeeches = useMemo(
+    () =>
+      gameState.players
+        .filter((player) => !player.isHuman && !player.isEliminated)
+        .map((player) => buildBotSpeech(player, stableSpeechRng(`${gameState.round}:${player.id}`))),
+    [gameState.players, gameState.round]
+  );
+  const pendingHumanPeek = gameState.phase === 'resolvePublicCards' && !human?.isEliminated && human?.playedCard?.type === 'peek' && !human.hasResolvedPeek;
+  const { speechIndex, discussionPaused, announcementVisible, skipDiscussion, toggleDiscussionPause } = useRoundFlow({
+    gameState,
+    onGameStateChange,
+    paused: flowPaused || Boolean(inspectedCard) || pendingHumanPeek
+  });
 
   function resetCardState() {
     setChosenFaction('');
@@ -100,22 +111,33 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
   }, [gameState.round, gameState.phase, handKey, human?.chosenFaction, human?.commitment]);
 
   useEffect(() => {
+    // 重開可能仍是相同回合、階段與手牌；新初始對局必須清掉尚未確認的選擇。
+    if (gameState.round === 1 && gameState.phase === 'commitment' && !human?.commitment && gameState.roundResults.length === 0) {
+      setCommitment('');
+      resetCardState();
+      dragSourceRef.current = null;
+    }
+  }, [gameState]);
+
+  useEffect(() => {
     if (hasPeekConfirmed) {
       return;
     }
     const targetPool =
       gameState.phase === 'resolvePublicCards' && human?.playedCard?.type === 'peek' && !human.hasResolvedPeek && human.id
         ? getPeekTargetPlayers(gameState, human.id)
+        : gameState.phase === 'resolvePublicCards' && human?.playedCard?.type === 'chaos' && !human.hasResolvedChaos && human.id
+          ? getChaosTargetPlayers(gameState, human.id)
         : otherPlayers;
     if (!targetPlayerId || !targetPool.some((player) => player.id === targetPlayerId)) {
       setTargetPlayerId(targetPool[0]?.id ?? '');
     }
-  }, [gameState, hasPeekConfirmed, human?.id, human?.hasResolvedPeek, human?.playedCard?.type, otherPlayers, targetPlayerId]);
+  }, [gameState, hasPeekConfirmed, human?.id, human?.hasResolvedChaos, human?.hasResolvedPeek, human?.playedCard?.type, otherPlayers, targetPlayerId]);
 
   useEffect(() => {
     if (selectedCard && chosenFaction && !canUseCardWithFaction(selectedCard, chosenFaction)) {
       setSelectedCard('');
-      setLocalError(`${CARD_LABELS[selectedCard]} 需要搭配盟約陣營使用。`);
+      setLocalError(`${CARD_LABELS[selectedCard]} ${cardRequirementText(selectedCard) ?? '不可搭配此陣營'}。`);
     }
   }, [chosenFaction, selectedCard]);
 
@@ -124,61 +146,66 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
   }
 
   const humanPlayer = human;
-  const pendingHumanPeek =
-    gameState.phase === 'resolvePublicCards' && humanPlayer.playedCard?.type === 'peek' && !humanPlayer.hasResolvedPeek;
   const peekTargetPlayers = pendingHumanPeek ? getPeekTargetPlayers(gameState, humanPlayer.id) : [];
   const pendingPeekTarget = peekTargetPlayers.find((player) => player.id === targetPlayerId) ?? peekTargetPlayers[0];
   const confirmedPeekTarget = peekTargetPlayers.find((player) => player.id === confirmedPeekTargetId);
   const lockedPeekTarget = hasPeekConfirmed ? confirmedPeekTarget : undefined;
+  const pendingHumanChaos =
+    gameState.phase === 'resolvePublicCards' && !humanPlayer.isEliminated && humanPlayer.playedCard?.type === 'chaos' && !humanPlayer.hasResolvedChaos;
+  const chaosTargetPlayers = pendingHumanChaos ? getChaosTargetPlayers(gameState, humanPlayer.id) : [];
+  const pendingChaosTarget = chaosTargetPlayers.find((player) => player.id === targetPlayerId) ?? chaosTargetPlayers[0];
   const committedFaction = humanPlayer.commitment ?? commitment;
   const lockedFaction = humanPlayer.chosenFaction ?? chosenFaction;
   const lockedCard = humanPlayer.playedCard?.type ?? selectedCard;
   const lockedFunctionSelection: FunctionCardSelection | '' =
     humanPlayer.functionCardSelection ?? (humanPlayer.chosenFaction ? humanPlayer.playedCard?.type ?? 'blank' : lockedCard);
-  const canAdvance =
-    gameState.phase !== 'gameEnd' &&
-    !(gameState.phase === 'commitment' && !humanPlayer.commitment) &&
-    !(gameState.phase === 'fateDeclare' && !humanPlayer.hasResolvedFateDeclaration) &&
-    !(gameState.phase === 'playCards' && !humanPlayer.chosenFaction) &&
-    !pendingHumanPeek;
-  const canChooseCommitment = gameState.phase === 'commitment' && !humanPlayer.commitment;
-  const canDeclareFate = gameState.phase === 'fateDeclare' && !humanPlayer.hasResolvedFateDeclaration;
-  const canChoosePlay = gameState.phase === 'playCards' && !humanPlayer.chosenFaction;
+  const canChooseCommitment = gameState.phase === 'commitment' && !humanPlayer.isEliminated && !humanPlayer.commitment;
+  const canDeclareFate = gameState.phase === 'fateDeclare' && !humanPlayer.isEliminated && !humanPlayer.hasResolvedFateDeclaration;
+  const canChoosePlay = gameState.phase === 'playCards' && !humanPlayer.isEliminated && !humanPlayer.chosenFaction;
   const showBlankOrderPreview = canChoosePlay && Boolean(chosenFaction) && !selectedCard;
-  const commitmentZoneClass = canChooseCommitment ? (committedFaction ? 'is-active-zone is-targeted-zone' : 'is-active-zone') : 'is-quiet-zone';
-  const factionZoneClass = canChoosePlay ? (lockedFaction ? 'is-active-zone is-targeted-zone' : 'is-active-zone') : 'is-quiet-zone';
-  const functionZoneClass =
-    canChoosePlay && lockedFaction ? (lockedFunctionSelection ? 'is-active-zone is-targeted-zone' : 'is-active-zone') : 'is-quiet-zone';
-  const currentSpeaker = gameState.players.find((player) => player.id === gameState.dealerPlayerId) ?? gameState.players[0];
   const publicCardPlayers = getPublicCardResolvePlayers(gameState);
-  const revealedPlayers = gameState.players.filter((player) => !player.isEliminated);
-  const currentResult = latestRoundResult?.round === gameState.round ? latestRoundResult : undefined;
 
   function inspectCard(target: CardDetailTarget) {
     setInspectedCard(target);
   }
 
-  function handleCommitmentCardClick(faction: Faction) {
-    inspectCard({ kind: 'commitment', faction });
+  function castPayload(payload: DragPayload, source: HTMLButtonElement | null, origin?: DropPoint) {
+    if (payload.kind === 'commitment') {
+      castCard({ source, destination: commitmentLandingRef.current, imageSrc: commitmentTokenImageByFaction[payload.faction], origin, tilt: -12 });
+    } else if (payload.kind === 'faction') {
+      castCard({ source, destination: factionLandingRef.current, imageSrc: factionCardImageByFaction[payload.faction], backImageSrc: cardBackImage, origin, tilt: -8 });
+    } else {
+      castCard({ source, destination: functionLandingRef.current, imageSrc: cardImageByType[payload.cardType], backImageSrc: cardBackImage, origin, tilt: 7 });
+    }
+  }
+
+  function rememberDragSource(source: HTMLButtonElement) {
+    dragSourceRef.current = source;
+  }
+
+  function handleCommitmentCardClick(faction: Faction, source: HTMLButtonElement) {
     if (!canChooseCommitment) {
+      inspectCard({ kind: 'commitment', faction });
       return;
     }
     setCommitment(faction);
     setLocalError('');
+    castPayload({ kind: 'commitment', faction }, source);
   }
 
-  function handleFactionCardClick(faction: Faction) {
-    inspectCard({ kind: 'faction', faction });
+  function handleFactionCardClick(faction: Faction, source: HTMLButtonElement) {
     if (!canChoosePlay) {
+      inspectCard({ kind: 'faction', faction });
       return;
     }
     setChosenFaction(faction);
     setLocalError('');
+    castPayload({ kind: 'faction', faction }, source);
   }
 
-  function handleFunctionCardClick(card: CardType) {
-    inspectCard({ kind: 'function', cardType: card });
+  function handleFunctionCardClick(card: CardType, source: HTMLButtonElement) {
     if (!canChoosePlay) {
+      inspectCard({ kind: 'function', cardType: card });
       return;
     }
     if (card === 'fate') {
@@ -189,12 +216,17 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
       setLocalError('請先暗放盟約或叛離陣營牌。');
       return;
     }
+    if (card === 'gamble' && humanPlayer.hasUsedGambleThisGame) {
+      setLocalError('賭命每場遊戲最多只能使用 1 次。');
+      return;
+    }
     if (!canUseCardWithFaction(card, chosenFaction)) {
-      setLocalError(`${CARD_LABELS[card]} 需要搭配盟約陣營使用。`);
+      setLocalError(`${CARD_LABELS[card]} ${cardRequirementText(card) ?? '不可搭配此陣營'}。`);
       return;
     }
     setSelectedCard(card);
     setLocalError('');
+    castPayload({ kind: 'card', cardType: card }, source);
   }
 
   function handleCommitmentDrop(payload: DragPayload): boolean {
@@ -203,7 +235,7 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
       return false;
     }
     if (payload.kind !== 'commitment') {
-      setLocalError('請把承諾 token 放到承諾區。');
+      setLocalError('請先擲出一枚承諾印記。');
       return false;
     }
     setCommitment(payload.faction);
@@ -217,7 +249,7 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
       return false;
     }
     if (payload.kind !== 'faction') {
-      setLocalError('請把盟約或叛離牌放到陣營區。');
+      setLocalError('請先打出盟約或叛離陣營牌。');
       return false;
     }
     setChosenFaction(payload.faction);
@@ -231,7 +263,7 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
       return false;
     }
     if (payload.kind !== 'card') {
-      setLocalError('請把功能牌放到功能牌觸發區。');
+      setLocalError('請選擇一張功能牌打到桌面。');
       return false;
     }
     if (payload.cardType === 'fate') {
@@ -242,8 +274,12 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
       setLocalError('請先暗放盟約或叛離陣營牌。');
       return false;
     }
+    if (payload.cardType === 'gamble' && humanPlayer.hasUsedGambleThisGame) {
+      setLocalError('賭命每場遊戲最多只能使用 1 次。');
+      return false;
+    }
     if (!canUseCardWithFaction(payload.cardType, chosenFaction)) {
-      setLocalError(`${CARD_LABELS[payload.cardType]} 需要搭配盟約陣營使用。`);
+      setLocalError(`${CARD_LABELS[payload.cardType]} ${cardRequirementText(payload.cardType) ?? '不可搭配此陣營'}。`);
       return false;
     }
     setSelectedCard(payload.cardType);
@@ -251,9 +287,27 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     return true;
   }
 
+  function handleTableDrop(payload: DragPayload, point: DropPoint): boolean {
+    let accepted = false;
+    if (canChooseCommitment) {
+      accepted = handleCommitmentDrop(payload);
+    } else if (canChoosePlay) {
+      if (payload.kind === 'commitment') {
+        setLocalError('承諾已立，現在請打出陣營牌。');
+      } else {
+        accepted = payload.kind === 'faction' ? handleFactionDrop(payload) : handleCardDrop(payload);
+      }
+    }
+    if (accepted) {
+      castPayload(payload, dragSourceRef.current, point);
+    }
+    dragSourceRef.current = null;
+    return accepted;
+  }
+
   function handleCommitment() {
     if (!commitment) {
-      setLocalError('請先選擇一枚承諾 token。');
+      setLocalError('請先選擇一枚承諾印記。');
       return;
     }
     setLocalError('');
@@ -266,7 +320,11 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
       return undefined;
     }
     if (selectedCard && !canUseCardWithFaction(selectedCard, chosenFaction)) {
-      setLocalError(`${CARD_LABELS[selectedCard]} 需要搭配盟約陣營使用。`);
+      setLocalError(`${CARD_LABELS[selectedCard]} ${cardRequirementText(selectedCard) ?? '不可搭配此陣營'}。`);
+      return undefined;
+    }
+    if (selectedCard === 'gamble' && humanPlayer.hasUsedGambleThisGame) {
+      setLocalError('賭命每場遊戲最多只能使用 1 次。');
       return undefined;
     }
     return {
@@ -328,30 +386,6 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     onGameStateChange(submitHumanFateDeclaration(gameState, input));
   }
 
-  function handleAdvance() {
-    if (gameState.phase === 'gameEnd') {
-      return;
-    }
-    if (gameState.phase === 'commitment' && !humanPlayer.commitment) {
-      setLocalError('請先確認本回合承諾。');
-      return;
-    }
-    if (gameState.phase === 'fateDeclare' && !humanPlayer.hasResolvedFateDeclaration) {
-      setLocalError('請先處理宿命宣告。');
-      return;
-    }
-    if (gameState.phase === 'playCards' && !humanPlayer.chosenFaction) {
-      setLocalError('請先確認本回合出牌。');
-      return;
-    }
-    if (pendingHumanPeek) {
-      setLocalError('請先完成真理之眼指定與是否更換陣營的選擇。');
-      return;
-    }
-    setLocalError('');
-    onGameStateChange(advancePhase(gameState));
-  }
-
   function handlePeekTargetChange(playerId: string) {
     if (hasPeekConfirmed) {
       return;
@@ -407,13 +441,27 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     onGameStateChange(result.state);
   }
 
+  function handleResolveChaos() {
+    if (!pendingChaosTarget) {
+      setLocalError('請先選擇 1 名混沌目標。');
+      return;
+    }
+    const result = resolveChaosChoice(gameState, humanPlayer.id, pendingChaosTarget.id);
+    if (result.error) {
+      setLocalError(result.error);
+      return;
+    }
+    setLocalError('');
+    onGameStateChange(result.state);
+  }
+
   function renderCommitmentSlot(faction: Faction | '') {
     if (!faction) {
       return undefined;
     }
     return (
       <button className="placed-card placed-card-button token-placed" type="button" onClick={() => inspectCard({ kind: 'commitment', faction })}>
-        <img src={commitmentTokenImageByFaction[faction]} alt="" onError={(event) => event.currentTarget.remove()} />
+        <CommitmentTokenArt faction={faction} />
         <span>承諾：{factionLabels[faction]}</span>
       </button>
     );
@@ -444,60 +492,8 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     );
   }
 
-  function renderStaticSlot(title: string, hint: string, children?: ReactNode, className = '') {
-    return (
-      <section className={`drop-zone table-card-slot is-static ${className}`}>
-        <span className="drop-zone-title">{title}</span>
-        <div className="drop-zone-body">{children ?? <span className="drop-zone-hint">{hint}</span>}</div>
-      </section>
-    );
-  }
-
-  function renderCommitmentMarker(player: PlayerState) {
-    return (
-      <span className="table-token-marker" key={player.id}>
-        <span>{player.name}</span>
-        {player.commitment ? (
-          <img src={commitmentTokenImageByFaction[player.commitment]} alt="" onError={(event) => event.currentTarget.remove()} />
-        ) : (
-          <span className="empty-token">?</span>
-        )}
-      </span>
-    );
-  }
-
-  function renderCommitmentZone() {
-    const content = renderCommitmentSlot(committedFaction);
-
-    if (gameState.phase === 'commitment' && !humanPlayer.commitment) {
-      return (
-        <DropZone className={`table-token-slot ${commitmentZoneClass}`} title="你的承諾 token" hint="拖曳一枚承諾 token" onDropPayload={handleCommitmentDrop}>
-          {content}
-        </DropZone>
-      );
-    }
-
-    return renderStaticSlot('你的承諾 token', '等待承諾', content, commitmentZoneClass);
-  }
-
-  function renderFactionZone() {
-    const content = lockedFaction
-      ? renderHiddenCardSlot('已暗放', factionCardImageByFaction[lockedFaction], factionLabels[lockedFaction], { kind: 'faction', faction: lockedFaction })
-      : undefined;
-
-    if (gameState.phase === 'playCards' && !humanPlayer.chosenFaction) {
-      return (
-        <DropZone className={`table-card-slot ${factionZoneClass}`} title="陣營牌放置區" hint="拖曳盟約或叛離牌" onDropPayload={handleFactionDrop}>
-          {content}
-        </DropZone>
-      );
-    }
-
-    return renderStaticSlot('陣營牌放置區', '等待暗放陣營', content, factionZoneClass);
-  }
-
-  function renderFunctionZone() {
-    const content = lockedFunctionSelection
+  function renderTablePieces() {
+    const functionPiece = lockedFunctionSelection
       ? lockedFunctionSelection === 'blank'
         ? renderHiddenCardSlot('已暗放', cardBackImage, '空白密令', { kind: 'blankFunction' })
         : renderHiddenCardSlot('已暗放', cardImageByType[lockedFunctionSelection], CARD_LABELS[lockedFunctionSelection], {
@@ -506,15 +502,19 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
           })
       : undefined;
 
-    if (gameState.phase === 'playCards' && !humanPlayer.chosenFaction) {
-      return (
-        <DropZone className={`table-card-slot ${functionZoneClass}`} title="功能牌觸發區" hint="可選擇 1 張功能牌" onDropPayload={handleCardDrop}>
-          {content}
-        </DropZone>
-      );
-    }
-
-    return renderStaticSlot('功能牌觸發區', '等待暗放密令', content, functionZoneClass);
+    return (
+      <div className="tribunal-your-table" aria-label="你已打到桌面的牌與印記">
+        <div className={`table-cast-landing ${committedFaction ? 'has-piece' : ''}`} data-cast-kind="commitment" ref={commitmentLandingRef}>
+          {renderCommitmentSlot(committedFaction)}
+        </div>
+        <div className={`table-cast-landing ${lockedFaction ? 'has-piece' : ''}`} data-cast-kind="faction" ref={factionLandingRef}>
+          {lockedFaction ? renderHiddenCardSlot('已暗放陣營', factionCardImageByFaction[lockedFaction], factionLabels[lockedFaction], { kind: 'faction', faction: lockedFaction }) : null}
+        </div>
+        <div className={`table-cast-landing ${functionPiece ? 'has-piece' : ''}`} data-cast-kind="card" ref={functionLandingRef}>
+          {functionPiece}
+        </div>
+      </div>
+    );
   }
 
   function playerNameById(playerId?: string) {
@@ -534,33 +534,20 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     );
   }
 
-  function renderCommitmentStage() {
-    return (
-      <section className="phase-playfield commitment-playfield" aria-label="承諾階段牌桌">
-        {renderStageTitle('公開承諾', '選擇本回合承諾', '中央只接收承諾 token')}
-        <div className="stage-token-focus">
-          {renderCommitmentZone()}
-        </div>
-        <div className="stage-token-rim" aria-label="所有玩家承諾狀態">
-          {gameState.players.map(renderCommitmentMarker)}
-        </div>
-      </section>
-    );
-  }
-
   function renderDiscussionStage() {
+    const speech = botSpeeches[speechIndex];
     return (
       <section className="phase-playfield discussion-playfield" aria-label="發言階段牌桌">
-        {renderStageTitle('發言階段', currentSpeaker ? `${currentSpeaker.name} 帶頭發言` : '自由討論', '手牌可查看，不可出牌')}
-        <div className="speaker-spotlight">
-          <span className="speaker-avatar">{currentSpeaker?.name.slice(0, 1) ?? '?'}</span>
-          <div>
-            <strong>{currentSpeaker?.name ?? '未知玩家'}</strong>
-            <span>公開承諾狀態已上桌</span>
-          </div>
-        </div>
-        <div className="stage-token-rim is-compact" aria-label="公開承諾狀態">
-          {gameState.players.map(renderCommitmentMarker)}
+        {speech ? (
+          <article className="speaker-dialogue" key={speech.speakerPlayerId} aria-live="polite">
+            <strong>{speech.speakerName}</strong>
+            <p>「{speech.line.text}」</p>
+            <small>{speechIndex + 1} / {botSpeeches.length}</small>
+          </article>
+        ) : null}
+        <div className="discussion-controls">
+          <button type="button" onClick={toggleDiscussionPause} aria-pressed={discussionPaused}>{discussionPaused ? '繼續發言' : '暫停發言'}</button>
+          <button type="button" onClick={skipDiscussion}>略過發言</button>
         </div>
       </section>
     );
@@ -576,32 +563,40 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
             <span className="stage-empty">你已完成宿命宣告</span>
           ) : hasFate ? (
             <>
-              <div className="operation-options fate-declare-options">
-                <label>
-                  預言類型
-                  <select value={fateKind} onChange={(event) => setFateKind(event.target.value as FateKind)}>
-                    <option value="majority">勝負預言</option>
-                    <option value="identity">身分預言</option>
-                  </select>
-                </label>
-                <label>
-                  預言陣營
-                  <select value={fateFaction} onChange={(event) => setFateFaction(event.target.value as Faction)}>
-                    <option value="alliance">合作</option>
-                    <option value="betrayal">背叛</option>
-                  </select>
-                </label>
+              <div className="fate-choice-board">
+                <fieldset className="stage-choice-group">
+                  <legend>預言類型</legend>
+                  <button className={choiceButtonClass(fateKind === 'majority')} type="button" aria-pressed={fateKind === 'majority'} onClick={() => setFateKind('majority')}>
+                    勝負預言
+                  </button>
+                  <button className={choiceButtonClass(fateKind === 'identity')} type="button" aria-pressed={fateKind === 'identity'} onClick={() => setFateKind('identity')}>
+                    身分預言
+                  </button>
+                </fieldset>
+                <fieldset className="stage-choice-group">
+                  <legend>預言陣營</legend>
+                  <button className={choiceButtonClass(fateFaction === 'alliance')} type="button" aria-pressed={fateFaction === 'alliance'} onClick={() => setFateFaction('alliance')}>
+                    合作
+                  </button>
+                  <button className={choiceButtonClass(fateFaction === 'betrayal')} type="button" aria-pressed={fateFaction === 'betrayal'} onClick={() => setFateFaction('betrayal')}>
+                    背叛
+                  </button>
+                </fieldset>
                 {fateKind === 'identity' ? (
-                  <label>
-                    指定玩家
-                    <select value={targetPlayerId} onChange={(event) => setTargetPlayerId(event.target.value)}>
-                      {otherPlayers.map((player) => (
-                        <option value={player.id} key={player.id}>
-                          {player.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <fieldset className="stage-choice-group stage-choice-group-wide">
+                    <legend>指定玩家</legend>
+                    {otherPlayers.map((player) => (
+                      <button
+                        className={choiceButtonClass(targetPlayerId === player.id)}
+                        type="button"
+                        aria-pressed={targetPlayerId === player.id}
+                        key={player.id}
+                        onClick={() => setTargetPlayerId(player.id)}
+                      >
+                        {player.name}
+                      </button>
+                    ))}
+                  </fieldset>
                 ) : null}
               </div>
               <div className="peek-resolution-actions">
@@ -626,22 +621,35 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     );
   }
 
-  function renderPlayCardsStage() {
-    return (
-      <section className="phase-playfield playcards-playfield" aria-label="出牌階段牌桌">
-        {renderStageTitle('暗放出牌', '選擇陣營與功能牌', '只顯示本階段需要的卡槽')}
-        <div className="stage-card-slots">
-          {renderFactionZone()}
-          {renderFunctionZone()}
-        </div>
-      </section>
-    );
-  }
-
   function renderPublicCardsStage() {
     return (
       <section className="phase-playfield public-playfield" aria-label="公開功能牌觸發階段牌桌">
-        {renderStageTitle('公開處理列', '公開功能牌依序觸發', publicCardPlayers.length > 0 ? '真理之眼會在此指定與處理' : '本回合沒有公開功能牌')}
+        {renderStageTitle('公開處理列', '公開功能牌依序觸發', publicCardPlayers.length > 0 ? '真理之眼先處理，混沌後處理' : '本回合沒有公開功能牌')}
+        {pendingHumanChaos ? (
+          <div className="fate-declare-panel">
+            <div className="fate-choice-board chaos-choice-board">
+              <fieldset className="stage-choice-group stage-choice-group-wide">
+                <legend>混沌目標</legend>
+                {chaosTargetPlayers.map((player) => (
+                  <button
+                    className={choiceButtonClass(pendingChaosTarget?.id === player.id)}
+                    type="button"
+                    aria-pressed={pendingChaosTarget?.id === player.id}
+                    key={player.id}
+                    onClick={() => setTargetPlayerId(player.id)}
+                  >
+                    {player.name}
+                  </button>
+                ))}
+              </fieldset>
+            </div>
+            <div className="peek-resolution-actions">
+              <button className="confirm-button" type="button" onClick={handleResolveChaos} disabled={!pendingChaosTarget}>
+                確認混沌
+              </button>
+            </div>
+          </div>
+        ) : null}
         <div className="public-card-track">
           {publicCardPlayers.length === 0 ? <span className="stage-empty">沒有公開功能牌需要處理</span> : null}
           {publicCardPlayers.map((player) => {
@@ -662,6 +670,10 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
                       ? playedCard.targetPlayerId
                         ? `目標：${playerNameById(playedCard.targetPlayerId)}`
                         : '等待指定目標'
+                      : playedCard.type === 'chaos'
+                        ? playedCard.targetPlayerId
+                          ? `目標：${playerNameById(playedCard.targetPlayerId)}`
+                          : '等待指定目標'
                       : '等待最終判定'}
                   </span>
                 </div>
@@ -673,131 +685,21 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     );
   }
 
-  function renderRevealStage() {
-    return (
-      <section className="phase-playfield reveal-playfield" aria-label="揭示階段牌桌">
-        {renderStageTitle('揭示舞台', '翻開本回合暗放卡牌', '原選擇與最終判定在此確認')}
-        <div className="reveal-card-grid">
-          {revealedPlayers.map((player) => {
-            const chosenFactionLabel = player.chosenFaction ? factionLabels[player.chosenFaction] : '未出牌';
-            const judgedFactionLabel = player.judgedFaction ? factionLabels[player.judgedFaction] : chosenFactionLabel;
-            const functionSelection = player.functionCardSelection ?? player.playedCard?.type ?? (player.chosenFaction ? 'blank' : undefined);
-            const isBlankFunction = functionSelection === 'blank';
-            const functionImage = functionSelection && !isBlankFunction ? cardImageByType[functionSelection] : cardBackImage;
-            const functionLabel = isBlankFunction ? '空白密令' : functionSelection ? CARD_LABELS[functionSelection] : '未暗放';
-            return (
-              <article className="reveal-card-entry" key={player.id}>
-                <strong>{player.name}</strong>
-                <div className="reveal-card-pair">
-                  <span className="reveal-mini-card">
-                    <img src={player.chosenFaction ? factionCardImageByFaction[player.chosenFaction] : cardBackImage} alt="" onError={(event) => event.currentTarget.remove()} />
-                    <small>{chosenFactionLabel}</small>
-                  </span>
-                  <span className="reveal-mini-card">
-                    <img src={functionImage} alt="" onError={(event) => event.currentTarget.remove()} />
-                    <small>{functionLabel}</small>
-                    {isBlankFunction ? <em>空白功能牌 / 無效果</em> : null}
-                  </span>
-                </div>
-                <span className="judged-line">
-                  {chosenFactionLabel} → {judgedFactionLabel}
-                </span>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-    );
-  }
-
-  function renderJudgmentStage() {
-    const result = currentResult;
-    return (
-      <section className="phase-playfield judgment-playfield" aria-label="裁決結算牌桌">
-        {renderStageTitle('裁決結果', result ? situationLabels[result.situation.resultType] : '等待落槌', result ? result.summary : '推進階段後會執行本回合裁決')}
-        {result ? (
-          <div className="score-change-list">
-            {result.situation.validPlayerIds.map((playerId) => {
-              const player = gameState.players.find((candidate) => candidate.id === playerId);
-              const finalDelta = result.finalDeltaByPlayerId[playerId] ?? 0;
-              const currentPoints = player?.judgmentPoints ?? 0;
-              const previousPoints = currentPoints - finalDelta;
-              return (
-                <details className={player?.isHuman ? 'score-change-row is-human-score' : 'score-change-row'} key={playerId}>
-                  <summary>
-                    <span>{playerNameById(playerId)}</span>
-                    <strong>
-                      {previousPoints} → {currentPoints}
-                    </strong>
-                    <em className={finalDelta >= 0 ? 'positive-delta' : 'negative-delta'}>{finalDelta >= 0 ? `+${finalDelta}` : finalDelta}</em>
-                  </summary>
-                  {player ? <ScoreBreakdownPanel breakdown={buildScoreBreakdown(player, result)} compact /> : null}
-                </details>
-              );
-            })}
-          </div>
-        ) : (
-          <span className="stage-empty">裁決尚未執行</span>
-        )}
-      </section>
-    );
-  }
-
-  function renderDrawStage() {
-    const willDraw = !humanPlayer.isEliminated && humanPlayer.hand.length < 3;
-    return (
-      <section className="phase-playfield draw-playfield" aria-label="補牌階段牌桌">
-        {renderStageTitle('補牌階段', willDraw ? '功能牌補入手牌' : '手牌已滿', willDraw ? '未滿 3 張會補 1 張' : '本次跳過補牌')}
-        <div className="draw-stage-card">
-          <img src={cardBackImage} alt="" onError={(event) => event.currentTarget.remove()} />
-          <strong>{willDraw ? '準備補牌' : '跳過補牌'}</strong>
-          <span>{handLimitText(humanPlayer)}</span>
-        </div>
-      </section>
-    );
-  }
-
-  function renderRoundEndStage() {
-    return (
-      <section className="phase-playfield round-end-playfield" aria-label="回合結束牌桌">
-        {renderStageTitle('回合結束', currentResult ? situationLabels[currentResult.situation.resultType] : '準備下一回合', '查看戰報後可推進下一回合')}
-        <div className="round-end-token">
-          <strong>第 {gameState.round} 回合完成</strong>
-          <span>{currentResult?.summary ?? '本回合已收束'}</span>
-        </div>
-      </section>
-    );
-  }
-
   function renderStageCenter() {
-    if (gameState.phase === 'commitment') {
-      return renderCommitmentStage();
-    }
     if (gameState.phase === 'discussion') {
       return renderDiscussionStage();
     }
-    if (gameState.phase === 'fateDeclare') {
+    if (canDeclareFate && humanPlayer.hand.includes('fate')) {
       return renderFateDeclareStage();
     }
-    if (gameState.phase === 'playCards') {
-      return renderPlayCardsStage();
-    }
-    if (gameState.phase === 'resolvePublicCards') {
+    if (pendingHumanChaos) {
       return renderPublicCardsStage();
     }
-    if (gameState.phase === 'reveal') {
-      return renderRevealStage();
-    }
-    if (gameState.phase === 'resolveJudgment' || gameState.phase === 'gameEnd') {
-      return renderJudgmentStage();
-    }
-    if (gameState.phase === 'drawCards') {
-      return renderDrawStage();
-    }
-    return renderRoundEndStage();
+    return null;
   }
 
   function renderPrimaryAction() {
+    if (humanPlayer.isEliminated) return null;
     if (gameState.phase === 'commitment') {
       return (
         <button className="confirm-button" type="button" onClick={handleCommitment} disabled={Boolean(humanPlayer.commitment) || !commitment}>
@@ -815,87 +717,105 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
     return null;
   }
 
+  const stageCenter = renderStageCenter();
+
   return (
-    <section className="table-play-area" aria-label="中央審判區與你的操作區">
-      <div className="central-judgement-ui">
-        <div className="round-focus-strip">
-          <span>第 {gameState.round} 回合</span>
-          <strong>{PHASE_LABELS[gameState.phase]}</strong>
+    <section className={`table-play-area tribunal-play-area phase-${gameState.phase}`} aria-label="中央審判區與你的操作區">
+      <DropZone active={canChooseCommitment || canChoosePlay} title="審判牌桌" hint={canChooseCommitment ? '點選印記或拖到桌面立誓' : '點選手牌或拖到桌面出牌'} onDropPayload={handleTableDrop}>
+        <div className={`central-judgement-ui alpha-center-stage phase-${gameState.phase}${stageCenter ? ' has-stage-content' : ''}`}>
+          {announcementVisible && gameState.phase !== 'resolveJudgment' && gameState.phase !== 'gameEnd' ? (
+            <div className="stage-announcement" role="status" aria-atomic="true" key={`${gameState.round}-${gameState.phase}`}>
+              <TribunalPlaque>
+                <span className="tribunal-plaque-kicker">第 {String(gameState.round).padStart(2, '0')} 回合</span>
+                <strong className="tribunal-plaque-title">{PHASE_LABELS[gameState.phase]}</strong>
+              </TribunalPlaque>
+            </div>
+          ) : null}
+          {stageCenter ? <div className="stage-decision-surface">{stageCenter}</div> : null}
         </div>
-        <p className="phase-quick-hint">{phaseQuickHints[gameState.phase]}</p>
-        {renderStageCenter()}
-      </div>
+        {renderTablePieces()}
+      </DropZone>
 
-      <section className="player-foreground" aria-label="自己的操作區">
-        <div className="operation-player self-seat-hud">
-          <span>你的席位</span>
-          <strong>{humanPlayer.judgmentPoints} 裁決點</strong>
+      <section className="player-foreground alpha-player-foreground" aria-label="自己的操作區">
+        <div className="operation-player self-seat-hud tribunal-self-seat">
+          <span className="self-seat-avatar" aria-hidden="true">誓</span>
+          <span className="self-name">你的席位</span>
+          <strong><b>{humanPlayer.judgmentPoints}</b><span>裁決點</span></strong>
           <small>{handLimitText(humanPlayer)}</small>
+          <span className={`self-commitment ${humanPlayer.commitment ?? ''}`}>{humanPlayer.commitment ? `已承諾${factionLabels[humanPlayer.commitment]}` : '尚未立誓'}</span>
         </div>
 
-        <div className="hand-stage" aria-label="自己的手牌">
-          <div className="operation-group token-tools hand-cluster">
-            <span className="operation-label">承諾 token</span>
+        <div className="hand-stage alpha-hand-stage" aria-label="自己的手牌">
+          <div className="operation-group token-tools hand-cluster alpha-hand-cluster">
+            <span className="operation-label">公開承諾</span>
             <div className="operation-card-row token-row">
               {(['alliance', 'betrayal'] as Faction[]).map((faction) => (
                 <DraggableCard
-                  className={`operation-card operation-token ${canChooseCommitment ? 'is-playable-card' : ''}`}
+                  className={`operation-card operation-token ${canChooseCommitment ? 'is-playable-card' : ''} ${committedFaction === faction ? 'is-on-table' : ''}`}
                   disabled={!canChooseCommitment}
                   imageSrc={commitmentTokenImageByFaction[faction]}
                   key={faction}
                   label={factionLabels[faction]}
                   payload={{ kind: 'commitment', faction }}
                   selected={committedFaction === faction}
-                  onClick={() => handleCommitmentCardClick(faction)}
+                  onClick={(source) => handleCommitmentCardClick(faction, source)}
+                  onPickUp={rememberDragSource}
+                  onInspect={() => inspectCard({ kind: 'commitment', faction })}
                 />
               ))}
             </div>
           </div>
 
-          <div className="operation-group faction-tools hand-cluster">
+          <div className="operation-group faction-tools hand-cluster alpha-hand-cluster">
             <span className="operation-label">陣營牌</span>
             <div className="operation-card-row">
               {(['alliance', 'betrayal'] as Faction[]).map((faction) => (
                 <DraggableCard
-                  className={`operation-card faction-action-card ${canChoosePlay ? 'is-playable-card' : ''}`}
+                  className={`operation-card faction-action-card ${canChoosePlay ? 'is-playable-card' : ''} ${lockedFaction === faction ? 'is-on-table' : ''}`}
                   disabled={!canChoosePlay}
                   imageSrc={factionCardImageByFaction[faction]}
                   key={faction}
                   label={factionLabels[faction]}
                   payload={{ kind: 'faction', faction }}
                   selected={lockedFaction === faction}
-                  onClick={() => handleFactionCardClick(faction)}
+                  onClick={(source) => handleFactionCardClick(faction, source)}
+                  onPickUp={rememberDragSource}
+                  onInspect={() => inspectCard({ kind: 'faction', faction })}
                 />
               ))}
             </div>
           </div>
 
-          <div className="operation-group hand-tools hand-cluster">
+          <div className="operation-group hand-tools hand-cluster alpha-hand-cluster">
             <span className="operation-label">功能牌手牌</span>
             <div className="operation-card-row hand-fan">
               {humanPlayer.hand.length === 0 ? <span className="muted empty-hand">沒有功能牌</span> : null}
               {humanPlayer.hand.map((card, index) => {
-                const isPlayable = canChoosePlay && chosenFaction !== '' && card !== 'fate' && canUseCardWithFaction(card, chosenFaction);
+                const isGambleUnavailable = card === 'gamble' && Boolean(humanPlayer.hasUsedGambleThisGame);
+                const isPlayable =
+                  canChoosePlay && chosenFaction !== '' && card !== 'fate' && !isGambleUnavailable && canUseCardWithFaction(card, chosenFaction);
                 const isDisabled = !isPlayable;
                 return (
                   <DraggableCard
-                    className={`operation-card hand-action-card ${isPlayable ? 'is-playable-card' : ''}`}
+                    className={`operation-card hand-action-card ${isPlayable ? 'is-playable-card' : ''} ${selectedCard === card ? 'is-on-table' : ''}`}
                     disabled={isDisabled}
                     imageSrc={cardImageByType[card]}
                     key={`${card}-${index}`}
                     label={CARD_LABELS[card]}
                     note={
                       isDisabled && gameState.phase === 'playCards' && !humanPlayer.chosenFaction
-                        ? card === 'fate'
-                          ? '宣告階段'
+                        ? isGambleUnavailable
+                          ? '已使用'
                           : chosenFaction
-                            ? '需搭配盟約'
+                            ? cardRequirementText(card)
                             : '先選陣營'
                         : undefined
                     }
                     payload={{ kind: 'card', cardType: card }}
                     selected={selectedCard === card}
-                    onClick={() => handleFunctionCardClick(card)}
+                    onClick={(source) => handleFunctionCardClick(card, source)}
+                    onPickUp={rememberDragSource}
+                    onInspect={() => inspectCard({ kind: 'function', cardType: card })}
                   />
                 );
               })}
@@ -903,15 +823,13 @@ export function TablePlayArea({ gameState, onGameStateChange }: TablePlayAreaPro
           </div>
         </div>
 
-        <div className="operation-actions action-corner">
-          <button className="secondary-button quiet-button" type="button" onClick={() => setSelectedCard('')} disabled={Boolean(humanPlayer.chosenFaction) || gameState.phase !== 'playCards'}>
+        <div className="operation-actions action-corner alpha-command-stack">
+          <span className="command-caption">{humanPlayer.isEliminated ? '觀戰中' : canChooseCommitment ? '立下你的誓言' : canChoosePlay ? '決定你的密令' : ''}</span>
+          <button className="secondary-button quiet-button" type="button" onClick={() => { cancelCast(); setSelectedCard(''); }} disabled={Boolean(humanPlayer.chosenFaction) || gameState.phase !== 'playCards'}>
             不使用功能牌
           </button>
           {showBlankOrderPreview ? <p className="blank-order-note">空白密令：本回合不使用功能牌，無效果。</p> : null}
           {renderPrimaryAction()}
-          <button className="phase-advance-button" type="button" onClick={handleAdvance} disabled={!canAdvance}>
-            推進階段
-          </button>
           {localError ? <p className="table-error">{localError}</p> : null}
         </div>
       </section>

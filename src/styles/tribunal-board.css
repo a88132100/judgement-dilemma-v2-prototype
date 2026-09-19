@@ -1,0 +1,446 @@
+/* 審判庭第三版：場景、桌上物件與玩家前景各有固定層級。 */
+/* 卷宗、分數明細與終局沿用各自的內容排版，場景物件則重設舊定位。 */
+:where(.tribunal-board, .tribunal-board *):where(:not(svg, svg *, .tribunal-report-overlay, .tribunal-report-overlay *, .score-breakdown-panel, .score-breakdown-panel *, .tribunal-result, .tribunal-result *)) { all: revert; box-sizing: border-box; }
+:where(.tribunal-board *)::before, :where(.tribunal-board *)::after { content: none; }
+.tribunal-board {
+  --gold: #cfb578;
+  --gold-dim: #766243;
+  --ink: #f0e6cf;
+  --muted: #b8b3a2;
+  --blue: #91cbda;
+  --red: #ed9c91;
+  --hud-height: 76px;
+  --hand-height: 216px;
+  --card-width: clamp(82px, 7.5vw, 144px);
+  display: grid;
+  grid-template-rows: var(--hud-height) minmax(0, 1fr);
+  width: 100%;
+  height: 100dvh;
+  min-height: 680px;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  overflow: clip;
+  isolation: isolate;
+  color: var(--ink);
+  background: #090e10;
+  font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+}
+.tribunal-board :is(h1,h2,h3,p) { margin: 0; }
+.tribunal-board button { font: inherit; color: inherit; cursor: pointer; }
+.tribunal-board button:focus-visible,
+.tribunal-board summary:focus-visible,
+.tribunal-modal :is(button,select):focus-visible { outline: 2px solid #ace2ee; outline-offset: 4px; }
+.tribunal-board button:disabled { opacity: .4; cursor: not-allowed; filter: saturate(.4); }
+.tribunal-board .tribunal-hud {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: clamp(12px, 1.8vw, 32px);
+  min-height: 0;
+  height: var(--hud-height);
+  width: 100%;
+  padding: 0 24px;
+  border: 0;
+  border-bottom: 1px solid #80673f;
+  border-radius: 0;
+  background: linear-gradient(180deg,#131b1d,#090e10);
+  box-shadow: 0 4px 20px #0008;
+}
+.tribunal-board .hud-brand { display: flex; gap: 8px; align-items: center; flex: 0 0 auto; }
+.tribunal-brand-sigil { display: block; width: 43px; height: 43px; color: var(--gold); }
+.tribunal-brand-sigil svg { width: 100%; height: 100%; }
+.tribunal-board .hud-brand strong { font-family: "PMingLiU", "Songti TC", serif; font-size: 26px; font-weight: 600; letter-spacing: .12em; color: var(--ink); }
+.tribunal-board .hud-brand small { display: block; color: var(--muted); font-size: 10px; letter-spacing: .2em; margin-top: 2px; }
+.tribunal-round { display: flex; gap: 6px; align-items: baseline; white-space: nowrap; color: var(--gold); }
+.tribunal-round > strong { font: 38px/1 Georgia,serif; }
+.tribunal-round > span { font-size: 12px; }
+.tribunal-round small { color: var(--muted); }
+.tribunal-phase-status { display: grid; gap: 4px; flex-shrink: 0; }
+.tribunal-phase-status > strong { color: var(--ink); font-size: 14px; font-weight: 500; }
+.tribunal-timer { display: flex; gap: 7px; align-items: center; font-size: 10px; color: var(--muted); }
+.tribunal-timer time { font-variant-numeric: tabular-nums; font-size: 12px; }
+.tribunal-end-label { color: var(--gold); font-size: 11px; }
+.tribunal-board .phase-flow { position: static; display: flex; flex: 1; justify-content: center; gap: 0; list-style: none; margin: 0; padding: 0; max-width: 700px; }
+.tribunal-board .phase-flow li { position: relative; display: flex; flex: 1; min-width: 40px; flex-direction: column; align-items: center; gap: 8px; color: #9a978b; font-size: 10px; white-space: nowrap; }
+.tribunal-board .phase-flow li::before { content: ''; position: absolute; top: 4px; left: -50%; width: 100%; height: 1px; background: #514737; }
+.tribunal-board .phase-flow li:first-child::before { display: none; }
+.phase-step-dot { position: relative; width: 9px; height: 9px; background: #111a1c; border: 1px solid #77694e; transform: rotate(45deg); }
+.tribunal-board .phase-flow .is-current { color: #f6deb0; }
+.tribunal-board .phase-flow .is-current .phase-step-dot { background: #dfc088; box-shadow: 0 0 16px #e7b55f; border-color: #ffe4b5; }
+.tribunal-board .phase-flow .is-past .phase-step-dot { background: #746548; }
+.tribunal-board .hud-actions { position: static; display: flex; gap: 4px; margin-left: auto; }
+.tribunal-board .hud-icon-button { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px; min-width: 44px; min-height: 44px; border: 0; background: none; box-shadow: none; color: var(--muted); font-size: 11px; }
+.tribunal-board .hud-icon-button svg { width: 19px; height: 19px; }
+.tribunal-board .hud-icon-button:hover { background: #cfb57812; color: var(--gold); }
+.tribunal-board .tribunal-arena { position: relative; display: block; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; overflow: clip; }
+.tribunal-board .tribunal-scene { position: relative; display: block; width: 100%; height: 100%; min-height: 0; max-width: none; border: 0; border-radius: 0; margin: 0; overflow: clip; background: #101717 var(--tribunal-scene-bg) center 52% / cover no-repeat; isolation: isolate; }
+.tribunal-board .tribunal-scene::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg,#0003,transparent 25%,transparent 63%,#05090bbf 100%); pointer-events: none; z-index: 0; }
+.tribunal-board .tribunal-scene::after { content: none; }
+.tribunal-scene-depth, .tribunal-table-stage { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+.tribunal-table-sigil { display: none; }
+.tribunal-table-inscription { display: none; }
+.tribunal-table-objects, .tribunal-board .table-play-area { position: absolute; inset: 0; display: block; min-height: 0; margin: 0; padding: 0; background: none; border: 0; pointer-events: none; }
+.tribunal-board .table-play-area > * { pointer-events: auto; }
+
+/* 坐姿角色直接置於場景，手臂與桌面相接，公開資訊收在桌邊小名牌。 */
+.tribunal-board .tribunal-opponent-seat { position: absolute; z-index: 4; display: block; width: 260px; height: 285px; min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 0; background: none; box-shadow: none; transform: translateX(-50%); text-align: center; pointer-events: none; }
+.tribunal-board .seat-top { left: 50%; top: -12px; width: 212px; height: 224px; }
+.tribunal-board .seat-left { left: 13%; top: 9%; }
+.tribunal-board .seat-right { left: 87%; top: 9%; }
+.seated-character-stage { position: absolute; inset: 0; display: block; }
+.seated-character-stage::after { content: ''; position: absolute; left: 8%; right: 8%; bottom: 14px; height: 18px; background: #0008; border-radius: 50%; filter: blur(10px); z-index: -1; }
+.seated-character-art { display: block; width: 100%; height: 100%; object-fit: contain; object-position: bottom; filter: drop-shadow(0 8px 6px #0009) brightness(.83) saturate(.82); }
+.seat-left .seated-character-art { transform: scaleX(-1); }
+.seated-player-plaque { position: absolute; bottom: -24px; left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: 1fr 38px; column-gap: 10px; align-items: center; min-width: 172px; padding: 5px 12px; background: linear-gradient(90deg,transparent,#091214e8 18%,#091214df 82%,transparent); text-shadow: 0 2px 3px #000; }
+.tribunal-board .seat-nameplate { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.tribunal-board .seat-nameplate h3 { font: 600 16px/1.3 "PMingLiU","Songti TC",serif; white-space: nowrap; color: #f3e4c6; }
+.tribunal-board .seat-personality { font-size: 9px; letter-spacing: .15em; color: var(--gold); }
+.tribunal-board .seat-score-row { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1px; border: 0; background: none; box-shadow: none; }
+.tribunal-board .seat-score-row strong { color: #f4e5c7; font: 30px/1 Georgia,serif; }
+.tribunal-board .seat-score-row span { color: var(--muted); font-size: 8px; white-space: nowrap; }
+.tribunal-board .seat-dealer-mark { position: absolute; left: -12px; top: 12px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid #ae9055; background: #6d572d; color: #eee0b9; display: grid; place-items: center; font-size: 11px; box-shadow: 0 2px 4px #000; }
+.tribunal-board .seat-card-readiness { grid-column: 1 / -1; color: #aaa794; font-size: 9px; text-align: left; margin-top: 3px; }
+.tribunal-board .is-close-to-victory .seat-score-row strong { color: #ffe4a8; text-shadow: 0 0 14px #f7be4a; }
+.tribunal-board .seat-card.is-eliminated { opacity: .55; filter: grayscale(1); }
+.seat-eliminated-mark { position: absolute; z-index: 5; left: 25%; top: 35%; padding: 3px 15px; color: #ddd; background: #170b0be0; border-block: 1px solid #94685d; transform: rotate(-12deg); }
+
+/* 只有已打出的牌與公開印記出現在桌面，沒有空槽。 */
+.tribunal-seat-card-layer { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+.tribunal-seat-card-stack { position: absolute; display: flex; align-items: center; gap: 16px; transform: translateX(-50%); }
+.tribunal-seat-card-stack.seat-stack-top { left: 50%; top: 226px; }
+.tribunal-seat-card-stack.seat-stack-left { left: 23%; top: 66%; transform: translate(-50%,-50%) rotate(9deg); }
+.tribunal-seat-card-stack.seat-stack-right { left: 77%; top: 66%; transform: translate(-50%,-50%) rotate(-9deg); }
+.tribunal-table-card { width: 83px; height: 120px; position: relative; display: block; border: 0; background: none; transform: rotate(-5deg); }
+.tribunal-table-card.table-function-card { transform: translateY(7px) rotate(7deg); }
+.tribunal-table-card img { display: block; width: 100%; height: 100%; border-radius: 4px; object-fit: cover; box-shadow: 2px 4px 2px #000a, 2px 8px 12px #0009; }
+.tribunal-table-card small { position: absolute; bottom: 3px; left: 3px; right: 3px; padding: 3px 1px; text-align: center; font-size: 11px; color: #eee0c1; background: #061014dd; white-space: nowrap; text-shadow: 0 2px 3px #000; }
+.tribunal-table-card.is-revealed { animation: tribunal-reveal .35s ease-out; }
+.tribunal-table-card.faction-alliance small { color: var(--blue); }
+.tribunal-table-card.faction-betrayal small { color: var(--red); }
+.table-commitment-token { position: relative; display: block; flex-shrink: 0; width: 76px; height: 76px; transform: rotate(-8deg); filter: drop-shadow(1px 3px 2px #000b); }
+.table-commitment-token img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.table-commitment-token small { position: absolute; left: -8px; right: -8px; bottom: -24px; display: block; text-align: center; font-size: 13px; font-weight: 700; letter-spacing: .14em; text-shadow: 0 2px 4px #000; }
+.table-commitment-token.commitment-alliance { color: #a9e6ee; }
+.table-commitment-token.commitment-betrayal { color: #ffb2a3; }
+.tribunal-board .seat-top .seated-player-plaque { bottom: 4px; }
+@keyframes tribunal-opponent-play { from { opacity: 0; translate: 0 -34px; scale: 1.1; } to { opacity: 1; translate: 0 0; scale: 1; } }
+.tribunal-table-card, .table-commitment-token { animation: tribunal-opponent-play .38s ease-out; }
+
+.tribunal-deck-piles { position: absolute; z-index: 3; right: 6%; top: 61%; display: flex; align-items: center; gap: 14px; color: var(--gold); }
+.tribunal-draw-pile { position: relative; width: 53px; height: 77px; border: 1px solid #91764a; border-radius: 5px; background: linear-gradient(#05101463,#0510148c),url('../assets/cards/card_back.png') center/cover; box-shadow: 3px 3px #3c3a2c,5px 5px #161c1c,7px 7px #71603f, 8px 10px 10px #000a; display: grid; place-content: center; text-align: center; transform: rotate(9deg); }
+.tribunal-draw-pile strong { font: 24px Georgia,serif; text-shadow: 0 2px 3px black; }
+.tribunal-deck-piles small { display: block; font-size: 10px; }
+.tribunal-discard-pile { border: 1px dashed #76624377; border-radius: 4px; padding: 8px; text-align: center; opacity: .8; }
+
+/* 階段內容直接落在桌心；複雜宣告與結算可在安全範圍捲動。 */
+.tribunal-board .central-judgement-ui { position: absolute; z-index: 12; left: 50%; top: 32%; bottom: auto; width: min(43%, 620px); max-height: 260px; min-height: 0; padding: 8px 12px; margin: 0; transform: translateX(-50%); border: 0; background: none; box-shadow: none; text-align: center; overflow: auto; scrollbar-width: thin; scrollbar-color: #796747 transparent; pointer-events: none; }
+.tribunal-board .central-judgement-ui::before, .tribunal-board .central-judgement-ui::after { content: none; }
+.tribunal-board .round-focus-strip { display: none; }
+.tribunal-board .phase-quick-hint { margin: 0 0 10px; font-size: 11px; color: #cfcbc0; line-height: 1.6; }
+.tribunal-board .phase-playfield { position: static; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; height: auto; min-height: 0; max-height: none; overflow: visible; padding: 0; margin: 0; background: none; border: none; box-shadow: none; }
+.tribunal-board .stage-title { position: static; display: flex; flex-direction: column; gap: 4px; width: 100%; margin: 0; padding: 0; }
+.tribunal-board .stage-title > span { display: none; }
+.tribunal-board .stage-title strong { color: #f1e2bd; font: 600 clamp(20px,1.9vw,30px)/1.4 "PMingLiU","Songti TC",serif; letter-spacing: .12em; text-shadow: 0 2px 8px #000; }
+.tribunal-board .stage-title small { color: #c9c6ba; font-size: 11px; line-height: 1.5; }
+.tribunal-board .stage-token-focus { position: static; display: flex; justify-content: center; margin: 0; }
+.tribunal-board .stage-token-rim { display: none; }
+.tribunal-board .stage-decision-surface { pointer-events: auto; }
+.tribunal-board .central-judgement-ui:empty { display: none; }
+.tribunal-board .stage-announcement { width: 100%; max-width: 560px; margin: 0 auto 12px; pointer-events: none; animation: tribunal-announcement 1.5s both; }
+@keyframes tribunal-announcement { 0% { opacity: 0; transform: translateY(7px); } 15%,70% { opacity: 1; transform: none; } 100% { opacity: 0; transform: translateY(-5px); } }
+.tribunal-board .speaker-dialogue { width: 100%; padding: 16px 22px; border-left: 2px solid #b19a61; background: #07151de8; text-align: left; }
+.tribunal-board .speaker-dialogue strong { display: block; color: #ddc58f; font-size: 16px; }
+.tribunal-board .speaker-dialogue span { font-size: 11px; color: #b4c0be; }
+.tribunal-board .speaker-dialogue p { margin-top: 10px; font-size: 15px; line-height: 1.8; }
+.tribunal-board .discussion-controls { display: flex; gap: 12px; justify-content: center; margin-top: 10px; }
+.tribunal-board .discussion-controls button { padding: 8px 16px; border: 1px solid #74633e; background: #101d20; color: #d8c7a3; font-size: 12px; }
+.tribunal-board .tribunal-flow-status { color: #b8b3a2; font-size: 11px; }
+.tribunal-board:is([data-phase="fateDeclare"], [data-phase="resolvePublicCards"]) .central-judgement-ui.has-stage-content { z-index: 16; max-height: calc(100% - 290px); }
+.tribunal-board:is([data-phase="fateDeclare"], [data-phase="resolvePublicCards"]) .stage-decision-surface { padding: 15px 12px; background: linear-gradient(150deg, #25251ef7, #0c1211fa); border: 1px solid #9b80518c; box-shadow: inset 0 0 0 3px #070b0966, 0 6px 18px #0006; }
+/* 接牌範圍是整片桌面；定位錨點不繪製任何容器。 */
+.tribunal-board .table-cast-surface { position: absolute; inset: 0; display: block; border: 0; background: none; padding: 0; margin: 0; }
+.tribunal-board .tribunal-your-table { position: absolute; z-index: 9; left: 50%; top: 51.5%; transform: translateX(-50%); display: flex; align-items: center; justify-content: center; gap: 30px; height: 140px; pointer-events: none; }
+.tribunal-board .table-cast-landing { display: flex; align-items: center; justify-content: center; width: 96px; height: 140px; border: 0; padding: 0; background: none; box-shadow: none; transform: rotate(-7deg); pointer-events: none; }
+.tribunal-board .table-cast-landing[data-cast-kind="commitment"] { width: 92px; height: 92px; transform: rotate(-10deg); margin-right: 10px; }
+.tribunal-board .table-cast-landing[data-cast-kind="card"] { transform: translateY(7px) rotate(8deg); }
+.tribunal-board .placed-card { display: flex; flex-direction: column; align-items: center; width: 100%; height: 100%; padding: 0; min-height: 0; background: none; border: 0; box-shadow: none; pointer-events: auto; }
+.tribunal-board .placed-card img { display: block; width: 100%; height: 100%; object-fit: contain; border-radius: 4px; filter: drop-shadow(2px 5px 2px #000c) drop-shadow(0 7px 9px #0009); }
+.tribunal-board .placed-card > span:not(.commitment-token-art) { position: absolute; bottom: -23px; font-size: 12px; white-space: nowrap; color: #eee0be; text-shadow: 0 2px 3px #000; }
+.tribunal-board .token-placed { border-radius: 50%; filter: drop-shadow(1px 3px 2px #000b); }
+.tribunal-board .token-placed .commitment-token-art { width: 92px; height: 92px; }
+.tribunal-board .table-cast-landing .is-casting { visibility: hidden; }
+.tribunal-board .operation-card.is-on-table { opacity: .4; transform: scale(.94); filter: saturate(.5); }
+.tribunal-board .operation-card.is-on-table:hover, .tribunal-board .operation-card.is-on-table:focus-visible { opacity: .8; }
+.tribunal-board .operation-card.is-dragging { opacity: .2; }
+.tribunal-board:is([data-phase="commitment"],[data-phase="playCards"]) .central-judgement-ui { top: 43%; bottom: auto; overflow: visible; background: none; }
+.tribunal-board:is([data-phase="commitment"],[data-phase="playCards"]) .phase-quick-hint { display: none; }
+.tribunal-board[data-phase="gameEnd"] .tribunal-your-table { visibility: hidden; }
+
+.tribunal-board .speaker-spotlight { display: none; }
+.tribunal-board .bot-speech-board { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; width: 100%; padding: 0; }
+.tribunal-board .bot-speech-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px; margin: 0; background: linear-gradient(135deg,#293735e8,#0e191bba); border: 0; border-top: 1px solid #a0885380; border-radius: 2px 16px 16px 16px; text-align: left; }
+.tribunal-board .bot-speech-card > div { display: flex; flex-direction: column; gap: 3px; }
+.tribunal-board .bot-speech-card strong { font-size: 11px; color: #e8d5ad; }
+.tribunal-board .bot-speech-card span { color: #9eaaac; font-size: 9px; }
+.tribunal-board .bot-speech-card p { font-size: 12px; line-height: 1.65; color: #e1ded2; }
+.tribunal-board .fate-declare-panel { position: static; display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-height: none; overflow: visible; padding: 8px; background: #0a171db3; border: 1px solid #a08a513b; border-radius: 5px; }
+.tribunal-board .fate-choice-board { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; width: 100%; }
+.tribunal-board .stage-choice-group { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; min-width: 0; border: 0; margin: 0; padding: 3px; }
+.tribunal-board .stage-choice-group legend { color: #bdb197; font-size: 10px; width: 100%; text-align: left; padding: 0 4px; }
+.tribunal-board .stage-choice-group-wide { width: 100%; }
+.tribunal-board .stage-choice-button { min-height: 36px; padding: 5px 12px; color: #e6dbc3; font-size: 12px; border: 1px solid #76694b; border-radius: 3px; background: #162124; box-shadow: none; }
+.tribunal-board .stage-choice-button.is-selected { background: #b69a5a; color: #0c1517; border-color: #e2cb91; }
+.tribunal-board .peek-resolution-actions { display: flex; justify-content: center; gap: 10px; }
+.tribunal-board .stage-empty { display: block; color: #c3b89e; font-size: 13px; padding: 12px 0; }
+.tribunal-board .public-card-track { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.tribunal-board .public-card-entry { display: flex; align-items: center; gap: 8px; padding: 4px; background: none; border: 0; }
+.tribunal-board .public-card-entry > div { display: flex; flex-direction: column; gap: 4px; font-size: 10px; color: #c5b89b; text-align: left; }
+.tribunal-board .stage-card-thumb { display: flex; flex-direction: column; align-items: center; width: 50px; padding: 0; border: 0; background: none; font-size: 10px; }
+.tribunal-board .stage-card-thumb img { width: 45px; height: 65px; object-fit: cover; border-radius: 3px; }
+.tribunal-board .reveal-card-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; width: 100%; }
+.tribunal-board .reveal-card-entry { display: flex; flex-direction: column; gap: 6px; align-items: center; background: #07131985; border: 0; padding: 8px 4px; border-radius: 4px; }
+.tribunal-board .reveal-card-entry > strong { font-size: 10px; color: #d7cba9; }
+.tribunal-board .reveal-card-pair { display: flex; gap: 5px; }
+.tribunal-board .reveal-mini-card { display: flex; flex-direction: column; align-items: center; width: 43px; }
+.tribunal-board .reveal-mini-card img { width: 40px; height: 60px; object-fit: cover; border-radius: 3px; animation: tribunal-reveal .35s ease-out; }
+.tribunal-board .reveal-mini-card small { font-size: 9px; margin-top: 3px; }
+.tribunal-board .reveal-mini-card em { font-size: 8px; font-style: normal; color: #a8afa8; }
+.tribunal-board .judged-line { font-size: 10px; color: #cae0dc; }
+.tribunal-board .score-change-list { display: flex; flex-direction: column; gap: 5px; width: 100%; }
+.tribunal-board .score-change-row { padding: 0; border: 1px solid #6b65444a; border-radius: 3px; background: #071419d9; }
+.tribunal-board .score-change-row summary { display: grid; grid-template-columns: 1fr 80px 42px; gap: 12px; align-items: center; cursor: pointer; padding: 8px 14px; font-size: 12px; text-align: left; }
+.tribunal-board .score-change-row summary strong { font: 19px Georgia,serif; }
+.tribunal-board .score-change-row summary em { font-style: normal; font-size: 19px; }
+.tribunal-board .score-change-row.is-human-score { border-color: #bb9d62; }
+.tribunal-board .positive-delta { color: #91d8c0; }
+.tribunal-board .negative-delta { color: #f4a695; }
+.tribunal-board .draw-stage-card { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0; font-size: 11px; }
+.tribunal-board .draw-stage-card img { width: 50px; height: 75px; object-fit: cover; transform: rotate(8deg); box-shadow: 4px 5px 0 #606049; margin-bottom: 4px; }
+.tribunal-board .round-end-token { background: none; border: 0; display: flex; flex-direction: column; gap: 10px; color: #d4c29b; font-size: 13px; }
+
+/* 手牌沿著桌沿展開，選取與查看是分開的動作。 */
+.tribunal-board .player-foreground { position: absolute; z-index: 15; inset: auto 0 0; height: var(--hand-height); min-height: 0; padding: 0 3% 3px; margin: 0; display: grid; grid-template-columns: 155px minmax(0,1fr) 185px; align-items: end; gap: 16px; border: 0; border-radius: 0; background: linear-gradient(180deg,transparent,#060e1280 48%,#060c10e8); box-shadow: none; pointer-events: none; }
+.tribunal-board .player-foreground > * { pointer-events: auto; }
+.tribunal-board .self-seat-hud { position: relative; inset: auto; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; width: auto; height: 158px; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; }
+.tribunal-board .self-seat-avatar { position: absolute; top: -8px; left: 50%; transform: translateX(-50%); display: grid; place-items: center; width: 60px; height: 64px; border: 1px solid #a08954; border-radius: 48% 48% 40% 40%; color: #d3ba80; background: radial-gradient(ellipse at 50% 0,#294148,#0b191e 78%); box-shadow: inset 0 0 0 4px #131c20,0 5px 18px #000; font: 27px "PMingLiU",serif; }
+.tribunal-board .self-seat-hud .self-name { color: #d7ccaf; font-size: 12px; letter-spacing: .25em; }
+.tribunal-board .self-seat-hud > strong { display: flex; align-items: baseline; gap: 7px; font-size: 11px; font-weight: normal; color: #c0bbac; }
+.tribunal-board .self-seat-hud > strong b { color: #f1e4c7; font: 37px/1 Georgia,serif; }
+.tribunal-board .self-seat-hud small { font-size: 10px; color: #b4b8ad; }
+.self-commitment { font-size: 10px; color: #b3aa91; }
+.self-commitment.alliance { color: var(--blue); }
+.self-commitment.betrayal { color: var(--red); }
+.tribunal-board .hand-stage { position: static; display: flex; align-items: flex-end; justify-content: center; gap: clamp(15px,2vw,32px); width: 100%; min-width: 0; height: auto; max-width: none; transform: none; margin: 0; padding: 0; }
+.tribunal-board .operation-group { position: static; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 0; margin: 0; min-width: 0; border: 0; background: none; box-shadow: none; }
+.tribunal-board .operation-label { position: static; color: #c7b688; font-size: 11px; letter-spacing: .25em; text-shadow: 0 2px 4px #000; }
+.tribunal-board .operation-card-row { display: flex; align-items: flex-end; gap: 7px; margin: 0; padding: 0; }
+.tribunal-board .card-piece { position: relative; display: block; width: var(--card-width); flex: 0 0 var(--card-width); --hand-tilt: 0deg; --hand-rest: 72px; transform: translateY(var(--hand-rest)) rotate(var(--hand-tilt)); transform-origin: center bottom; transition: transform .2s ease; }
+.tribunal-board .card-piece:hover, .tribunal-board .card-piece:focus-within { z-index: 5; transform: translateY(0) rotate(0); }
+.tribunal-board .operation-card { position: relative; display: block; width: 100%; height: calc(var(--card-width) * 1.46); min-height: 0; padding: 0; margin: 0; overflow: hidden; border: 1px solid #9b8450; border-radius: 7px; background: #0e1b20; box-shadow: 0 10px 15px #000b, inset 0 0 0 3px #2a2b22; transform: none; opacity: 1; }
+.tribunal-board .operation-card::before, .tribunal-board .operation-card::after { content: none; }
+.tribunal-board .operation-card .draggable-card-image { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center; opacity: 1; filter: sepia(.15) brightness(.8) contrast(1.14); }
+.tribunal-board .draggable-card-label { position: absolute; top: 9px; left: 0; right: 0; z-index: 2; padding: 5px 3px; color: #eee3c4; background: #0b131bed; font-family: "PMingLiU",serif; font-size: 16px; font-weight: 600; letter-spacing: .05em; text-align: center; }
+.tribunal-board .draggable-card-note { position: absolute; top: 5px; left: 4px; right: 4px; padding: 3px; color: #f0d7ae; background: #081317da; font-size: 9px; text-align: center; }
+.tribunal-board .operation-card.is-disabled { opacity: .76; cursor: pointer; }
+.tribunal-board .operation-card.is-playable-card { border-color: #91b9b2; box-shadow: 0 0 11px #6fa49b50,0 8px 15px #0009; }
+.tribunal-board .operation-card.is-selected { border: 2px solid #f0d698; box-shadow: 0 0 16px #ddb66460,0 8px 15px #0009; }
+.tribunal-board .operation-card.is-selected .draggable-card-image { filter: sepia(.12) brightness(1.03); }
+.tribunal-board .hand-fan { gap: 0; padding-inline: 4px; }
+.tribunal-board .hand-fan .card-piece { margin-left: -9px; }
+.tribunal-board .hand-fan .card-piece:first-child { margin-left: 0; --hand-tilt: -6deg; }
+.tribunal-board .hand-fan .card-piece:last-child { --hand-tilt: 6deg; }
+.tribunal-board .hand-fan .card-piece:only-child { --hand-tilt: 0deg; }
+.tribunal-board .hand-fan .card-piece:hover, .tribunal-board .hand-fan .card-piece:focus-within { transform: translateY(0) rotate(0); }
+.tribunal-board .card-inspect-button { position: absolute; z-index: 3; right: 3px; top: 3px; display: grid; place-items: center; padding: 3px 6px; min-height: 25px; border: 1px solid #c4aa6766; border-radius: 3px; background: #0c171de6; color: #e2d7bf; box-shadow: none; font-size: 9px; opacity: 0; transition: opacity .16s; }
+.tribunal-board .card-piece:hover .card-inspect-button, .tribunal-board .card-piece:focus-within .card-inspect-button { opacity: 1; }
+.tribunal-board .token-tools .card-piece { width: 62px; flex-basis: 62px; }
+.tribunal-board .operation-token { height: 78px; background: none; border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
+/* 原圖改由裁切視窗承載後，明確讓按鈕接手原生拖曳，避免全域 reset 清除拖曳樣式。 */
+.tribunal-board .operation-token[draggable="true"] { -webkit-user-drag: element; user-select: none; }
+.tribunal-board .operation-token .draggable-card-image { width: 58px; height: 58px; object-fit: contain; border-radius: 50%; filter: none; box-shadow: 0 3px 5px #0008; }
+.tribunal-board .operation-token .draggable-card-label { top: auto; bottom: 0; padding: 0; background: none; font-size: 13px; }
+.tribunal-board .operation-token.is-selected { border: 0; box-shadow: none; }
+.tribunal-board .operation-token.is-playable-card { border: 0; background: none; box-shadow: none; }
+.tribunal-board .operation-token.is-selected .commitment-token-art { outline: 2px solid #dfc482; outline-offset: 3px; box-shadow: 0 0 12px #e1b95644; }
+.tribunal-board .token-tools { margin-bottom: 10px; }
+.tribunal-board .token-tools .card-piece { --hand-rest: 22px; }
+.tribunal-board .operation-label { transform: translateY(50px); transition: transform .2s; }
+.tribunal-board .token-tools .operation-label { transform: translateY(20px); }
+.tribunal-board .operation-group:has(.card-piece:hover) .operation-label, .tribunal-board .operation-group:focus-within .operation-label { transform: none; }
+.tribunal-board[data-phase="playCards"] .faction-tools .card-piece, .tribunal-board[data-phase="playCards"] .hand-tools .card-piece, .tribunal-board[data-phase="fateDeclare"] .hand-tools .card-piece { --hand-rest: 48px; }
+.tribunal-board .card-piece.is-raised { z-index: 6; transform: translateY(0) rotate(0); }
+.tribunal-board .draggable-card-note { display: none; }
+.tribunal-board .card-piece:is(:hover,:focus-within,.is-raised) .draggable-card-note { display: block; }
+.tribunal-board .card-piece:is(:hover,:focus-within,.is-raised) .draggable-card-label { top: auto; bottom: 0; padding: 20px 3px 7px; background: linear-gradient(transparent,#0b131bea 50%); }
+.tribunal-board .token-tools .card-piece:is(:hover,:focus-within,.is-raised) .draggable-card-label { padding: 0; background: none; }
+.tribunal-board .card-piece.is-raised .card-inspect-button { opacity: 1; }
+.tribunal-board .self-seat-hud { margin-bottom: 25px; }
+.tribunal-board .empty-hand { display: grid; place-content: center; width: calc(var(--card-width) * 1.8); height: 90px; border: 1px dashed #7a70525c; color: #a4ad9e; font-size: 12px; }
+.tribunal-board .operation-actions { position: static; display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: auto; max-width: none; margin: 0 0 34px; padding: 0; background: none; border: 0; box-shadow: none; }
+.tribunal-board .command-caption { color: #d7c59d; font-size: 11px; text-align: center; letter-spacing: .2em; margin-bottom: 4px; }
+.tribunal-board .confirm-button, .tribunal-board .phase-advance-button { min-height: 44px; padding: 10px 20px; background: linear-gradient(180deg,#ceb775,#9c8042); border: 1px solid #edd5a0; border-radius: 4px 10px 4px 10px; color: #162023; box-shadow: inset 0 0 0 3px #5c4d4038,0 5px 14px #0008; font-weight: 700; font-size: 14px; letter-spacing: .08em; }
+.tribunal-board .phase-advance-button { background: linear-gradient(180deg,#2c454b,#18272e); border-color: #9d9970; color: #e9d8b1; }
+.tribunal-board .secondary-button { min-height: 36px; padding: 5px 10px; border: 1px solid #7367508c; border-radius: 3px; background: #0c181c94; color: #c4b99f; font-size: 11px; box-shadow: none; }
+.tribunal-board .operation-actions .secondary-button { order: 4; }
+.tribunal-board .operation-actions .confirm-button:disabled { display: none; }
+.tribunal-board .operation-actions .phase-advance-button:disabled { display: none; }
+.tribunal-board .operation-actions .secondary-button:disabled { display: none; }
+.tribunal-board .blank-order-note { order: 5; font-size: 10px; color: #b4b5a7; text-align: center; line-height: 1.5; }
+.tribunal-board .table-error { order: 6; background: #2b1313e6; color: #ffc7a8; font-size: 11px; padding: 8px; border-left: 2px solid #e7a57e; }
+.tribunal-board .tribunal-report-launchers { position: absolute; bottom: 4px; right: 3%; z-index: 20; display: flex; gap: 12px; }
+.tribunal-report-launchers button { display: flex; align-items: center; gap: 4px; min-height: 24px; padding: 0 4px; color: #b4aa91; background: none; border: 0; box-shadow: none; font-size: 10px; }
+.tribunal-report-launchers svg { width: 15px; height: 15px; }
+
+/* 卷宗與卡牌詳情使用浮層；私密查驗在獨立對話框呈現。 */
+.tribunal-report-overlay { color: #e9dec4; width: min(670px,92vw); max-height: 82dvh; padding: 0; border: 1px solid #aa8d58; border-radius: 6px; background: #111e23; box-shadow: 0 20px 80px #000; scrollbar-width: thin; }
+.tribunal-report-overlay::backdrop { background: #03090ccc; backdrop-filter: blur(6px); }
+.tribunal-report-content { padding: 24px; }
+.tribunal-report-heading { display: flex; justify-content: space-between; align-items: center; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid #746244; margin-bottom: 18px; }
+.tribunal-report-heading span { color: #b69e6b; font-size: 11px; }
+.tribunal-report-heading h2 { font: 26px "PMingLiU",serif; margin: 5px 0; }
+.tribunal-board .tribunal-report-close { background: none; border: 1px solid #746244; border-radius: 3px; color: #d5c8a8; padding: 7px 12px; box-shadow: none; }
+.tribunal-report-overlay .panel { position: static; border: 0; background: none; box-shadow: none; padding: 0; }
+.tribunal-report-overlay .event-log { max-height: none; }
+.tribunal-modal-backdrop { background: #03090dd9; backdrop-filter: blur(8px); z-index: 100; }
+.tribunal-modal { color: #eee2c8; border: 1px solid #ac8d51; border-radius: 9px; background: radial-gradient(ellipse at 15% 20%,#30434a,#101d23 70%); box-shadow: 0 25px 100px #000c; max-height: 88dvh; overflow-y: auto; scrollbar-width: thin; }
+.tribunal-modal :is(h2,strong) { color: #e8d09d; }
+.tribunal-modal :is(.card-detail-type,.card-effect-heading > span) { color: #c4a867; }
+.tribunal-modal :is(.card-detail-close,.secondary-button) { background: #0b181f; color: #d9c9a5; border-color: #897143; box-shadow: none; }
+.tribunal-modal .confirm-button { color: #111c20; background: linear-gradient(#ddc68c,#a7894c); border-color: #eed5a3; }
+.tribunal-modal .card-detail-copy dt { color: #bda87c; }
+.tribunal-modal .card-detail-copy dd { color: #e2dece; line-height: 1.8; }
+.tribunal-modal .peek-private-result { border: 1px solid #72adbc; background: #15313c; color: #d4f5ff; }
+.tribunal-board .tribunal-result { position: absolute; z-index: 40; left: 50%; top: 50%; transform: translate(-50%,-50%); width: min(580px,90%); max-height: 85%; overflow-y: auto; padding: 30px; border: 1px solid #c6a867; background: radial-gradient(ellipse at top,#2c403f,#0a181ff5); border-radius: 8px; box-shadow: 0 0 0 100vmax #02090cbd,0 0 60px #ba944123; }
+.tribunal-board .tribunal-result-backdrop { position: fixed; inset: 0; z-index: 40; background: #02090cbd; }
+/* 終局須蓋住同層的頂端資訊列，讓背景點擊不會移走對話框焦點。 */
+.tribunal-board .tribunal-arena:has(.tribunal-result-backdrop) { z-index: 50; }
+.tribunal-board .tribunal-result-backdrop .tribunal-result { box-shadow: 0 20px 70px #000b; }
+.tribunal-board .tribunal-result-hero { display: flex; flex-direction: column; align-items: center; gap: 16px; text-align: center; }
+.tribunal-board .tribunal-result-heading { width: 100%; }
+.tribunal-board .tribunal-result-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.tribunal-board .tribunal-result-hero h2 { font: 34px "PMingLiU",serif; color: #e8d1a0; margin: 12px 0; }
+.tribunal-board .result-winner { font-size: 21px; color: #f3e6c3; margin: 12px 0; }
+.tribunal-board .tribunal-result-meta { display: flex; flex-direction: column; gap: 4px; margin: 20px 0; font-size: 11px; color: #c1b89f; text-align: center; }
+.tribunal-board .ranking-row { border: 0; border-bottom: 1px solid #8e784142; border-radius: 0; background: none; font-size: 12px; }
+.tribunal-board .rank-number { color: #baa067; }
+.tribunal-board .eyebrow { color: #bdab7f; }
+.tribunal-board[data-phase="gameEnd"] .player-foreground { pointer-events: none; }
+@keyframes tribunal-reveal { from { opacity: .25; transform: scaleX(.45) translateY(5px); } to { opacity: 1; transform: none; } }
+
+/* 大螢幕增加坐姿角色與卡面的大小，仍保留桌面留白。 */
+@media (min-height: 880px) and (min-width: 1181px) {
+  .tribunal-board { --hand-height: 280px; }
+  .tribunal-board .tribunal-opponent-seat { width: 360px; height: 375px; }
+  .tribunal-board .seat-top { width: 295px; height: 305px; top: -5px; }
+  .tribunal-board .seat-score-row strong { font-size: 34px; }
+  .tribunal-board .seat-nameplate h3 { font-size: 22px; }
+  .tribunal-seat-card-stack.seat-stack-top { top: 320px; }
+  .tribunal-table-card { width: 94px; height: 134px; }
+  .tribunal-board .central-judgement-ui { top: 35%; }
+  .tribunal-board .tribunal-self-seat { height: 175px; }
+  .tribunal-board .phase-quick-hint, .tribunal-board .stage-title small { font-size: 13px; }
+  .tribunal-board .stage-title strong { font-size: 33px; }
+  .tribunal-board .bot-speech-card p { font-size: 14px; }
+}
+@media (max-width: 1180px) {
+  .tribunal-board { --card-width: 78px; --hand-height: 207px; }
+  .tribunal-board .tribunal-hud { gap: 12px; padding-inline: 14px; }
+  .tribunal-board .hud-brand strong { font-size: 21px; }
+  .tribunal-board .hud-brand small, .tribunal-brand-sigil, .tribunal-board .hud-icon-button span { display: none; }
+  .tribunal-board .phase-flow li { min-width: 29px; font-size: 9px; }
+  .tribunal-board .player-foreground { grid-template-columns: 105px minmax(0,1fr) 145px; gap: 10px; padding-inline: 20px; }
+  .tribunal-board .hand-stage { gap: 16px; }
+  .tribunal-board .token-tools .card-piece { width: 48px; flex-basis: 48px; }
+  .tribunal-board .operation-token .draggable-card-image { width: 45px; height: 45px; }
+  .tribunal-board .operation-token { height: 65px; }
+  .tribunal-board .seat-left { left: 13%; }
+  .tribunal-board .seat-right { left: 87%; }
+  .tribunal-board .tribunal-opponent-seat { width: 210px; height: 246px; }
+  .tribunal-board .seat-top { width: 190px; height: 212px; }
+  .tribunal-board .central-judgement-ui { width: 52%; }
+  .tribunal-seat-card-stack.seat-stack-left { left: 19%; }
+  .tribunal-seat-card-stack.seat-stack-right { left: 81%; }
+  .tribunal-board .bot-speech-card { grid-template-columns: 100px 1fr; padding: 7px; }
+  .tribunal-board .bot-speech-card p { font-size: 11px; }
+}
+/* 窄螢幕使用直向桌面；內容自然捲動，不將桌機畫面等比縮小。 */
+@media (max-width: 760px) {
+  html:has(.tribunal-board), body:has(.tribunal-board), #root:has(.tribunal-board) { height: auto; min-height: 100dvh; max-height: none; overflow: visible; }
+  .tribunal-board { height: auto; min-height: 100dvh; --hud-height: 116px; --card-width: 85px; overflow: visible; }
+  .tribunal-board .tribunal-hud { display: grid; grid-template-columns: 1fr auto auto; grid-template-rows: 62px 45px; gap: 0 14px; padding: 0 14px 8px; }
+  .tribunal-board .hud-brand strong { font-size: 23px; }
+  .tribunal-board .tribunal-round { grid-column: 2; grid-row: 1; }
+  .tribunal-board .tribunal-round strong { font-size: 30px; }
+  .tribunal-board .hud-actions { grid-column: 3; grid-row: 1; }
+  .tribunal-board .phase-flow { grid-row: 2; grid-column: 1 / -1; width: 100%; }
+  .tribunal-phase-status { display: none; }
+  .tribunal-board .tribunal-arena { min-height: 1350px; overflow: visible; }
+  .tribunal-board .tribunal-scene { min-height: 1350px; overflow: visible; background-position: center top; background-size: auto 1000px; background-color: #0a1318; }
+  .tribunal-board .tribunal-opponent-seat { top: 20px; width: 124px; height: 154px; }
+  .tribunal-board .seat-left { left: 17%; }
+  .tribunal-board .seat-top { left: 50%; }
+  .tribunal-board .seat-right { left: 83%; }
+  .seated-player-plaque { bottom: -60px; min-width: 112px; width: 112px; padding: 5px; grid-template-columns: 1fr 24px; gap: 4px; }
+  .tribunal-board .seat-nameplate h3 { font-size: 12px; white-space: normal; }
+  .tribunal-board .seat-score-row { position: static; width: auto; height: auto; }
+  .tribunal-board .seat-score-row strong { font-size: 23px; }
+  .tribunal-board .seat-score-row span { font-size: 7px; }
+  .tribunal-board .seat-dealer-mark { left: 2px; top: -17px; width: 23px; height: 23px; }
+  .tribunal-board .seat-card-readiness { font-size: 9px; }
+  .tribunal-seat-card-stack.seat-stack-top { left: 50%; top: 252px; }
+  .tribunal-seat-card-stack.seat-stack-left { left: 17%; top: 252px; transform: translateX(-50%) rotate(3deg); }
+  .tribunal-seat-card-stack.seat-stack-right { left: 83%; top: 252px; transform: translateX(-50%) rotate(-3deg); }
+  .tribunal-table-card { width: 47px; height: 69px; }
+  .tribunal-seat-card-stack { display: grid; grid-template-columns: repeat(2,47px); gap: 24px 5px; justify-items: center; }
+  .table-commitment-token { width: 58px; height: 58px; grid-column: 1 / -1; }
+  .table-commitment-token small { font-size: 12px; bottom: -20px; }
+  .tribunal-board .seat-top .seated-player-plaque { bottom: -60px; }
+  .tribunal-table-card small { font-size: 9px; padding: 1px 0; }
+  .tribunal-board .central-judgement-ui { top: 435px; bottom: auto; width: calc(100% - 24px); min-height: 0; max-height: 230px; padding: 10px 8px; }
+  .tribunal-board .stage-title strong { font-size: 24px; }
+  .tribunal-board:is([data-phase="commitment"],[data-phase="playCards"]) .central-judgement-ui { top: 465px; bottom: auto; min-height: 0; }
+  .tribunal-board .tribunal-your-table { top: 700px; bottom: auto; left: 50%; gap: 18px; transform: translateX(-50%) scale(.9); }
+  .tribunal-board:is([data-phase="fateDeclare"], [data-phase="resolvePublicCards"]) .central-judgement-ui.has-stage-content { max-height: 240px; }
+  .tribunal-board .phase-quick-hint { font-size: 11px; }
+  .tribunal-board .bot-speech-board { grid-template-columns: 1fr; }
+  .tribunal-board .bot-speech-card { display: grid; grid-template-columns: 95px 1fr; }
+  .tribunal-board .player-foreground { top: 880px; bottom: auto; height: auto; padding: 10px 12px 60px; grid-template-columns: 83px 1fr; align-items: start; gap: 15px 7px; background: linear-gradient(transparent,#081217 30%); }
+  .tribunal-board .self-seat-hud { height: 157px; }
+  .tribunal-board .self-seat-avatar { width: 51px; height: 57px; }
+  .tribunal-board .hand-stage { display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px; }
+  .tribunal-board .hand-tools { grid-column: 1 / -1; }
+  .tribunal-board .token-tools { margin-bottom: 0; align-self: center; }
+  .tribunal-board .operation-group { gap: 8px; }
+  .tribunal-board .operation-label { font-size: 10px; }
+  .tribunal-board .operation-card-row { gap: 4px; }
+  .tribunal-board .faction-tools { --card-width: 62px; }
+  .tribunal-board .draggable-card-label { font-size: 13px; }
+  .tribunal-board .operation-actions { grid-column: 1 / -1; width: 100%; margin: 0; flex-direction: row; flex-wrap: wrap; justify-content: center; align-items: center; }
+  .tribunal-board .command-caption { width: 100%; }
+  .tribunal-board .operation-actions > button { min-height: 44px; flex: 1; }
+  .tribunal-board .card-inspect-button { min-height: 28px; }
+  .tribunal-board .card-piece, .tribunal-board .hand-fan .card-piece, .tribunal-board .hand-fan .card-piece:hover, .tribunal-board .hand-fan .card-piece:focus-within { transform: none; }
+  .tribunal-board .operation-card { height: 80px; transition: height .2s; }
+  .tribunal-board .card-piece.is-raised .operation-card, .tribunal-board .card-piece:focus-within .operation-card { height: calc(var(--card-width) * 1.46); }
+  .tribunal-board .operation-card .draggable-card-image { object-position: top; }
+  .tribunal-board .operation-label, .tribunal-board .token-tools .operation-label { transform: none; }
+  .tribunal-board .operation-token, .tribunal-board .card-piece.is-raised .operation-token, .tribunal-board .card-piece:focus-within .operation-token { height: 65px; }
+  .tribunal-board .speaker-dialogue { padding: 12px 15px; }
+  .tribunal-board .speaker-dialogue p { font-size: 14px; }
+  .tribunal-board .blank-order-note, .tribunal-board .table-error { width: 100%; }
+  .tribunal-deck-piles { top: 594px; right: 20px; transform: scale(.8); transform-origin: right center; }
+  .tribunal-board .tribunal-report-launchers { bottom: 12px; right: 15px; }
+  .tribunal-report-launchers button { min-height: 36px; }
+  .tribunal-board .tribunal-result { position: fixed; top: 50dvh; max-height: 85dvh; padding: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tribunal-board *, .tribunal-modal * { animation: none !important; transition: none !important; }
+}
+/* 較矮的橫向視窗保留可捲動高度，避免手牌與按鈕被截掉。 */
+@media (max-height: 640px) and (min-width: 761px) {
+  html:has(.tribunal-board), body:has(.tribunal-board), #root:has(.tribunal-board) { height: auto; min-height: 100dvh; max-height: none; overflow: visible; }
+  .tribunal-board { height: 760px; }
+  .tribunal-board .tribunal-result { position: fixed; top: 50dvh; max-height: 88dvh; }
+}

@@ -120,6 +120,10 @@ export function resolveCommitmentDelta(
   const deltaByPlayerId: Record<string, number> = {};
   for (const player of getValidPlayers(players)) {
     const judgedFaction = situation.judgedFactionByPlayerId[player.id];
+    if (player.chaosTargetedThisRound && player.chosenFaction === player.commitment && judgedFaction !== player.commitment) {
+      deltaByPlayerId[player.id] = 0;
+      continue;
+    }
     deltaByPlayerId[player.id] = player.commitment === judgedFaction ? rulesConfig.commitmentDeltas.kept : rulesConfig.commitmentDeltas.broken;
   }
   return deltaByPlayerId;
@@ -132,15 +136,21 @@ export function buildFinalRoundResult(args: {
   adjustedBaseDeltaByPlayerId: Record<string, number>;
   shieldDeltaByPlayerId: Record<string, number>;
   counterDeltaByPlayerId: Record<string, number>;
+  mirrorDeltaByPlayerId: Record<string, number>;
   fateDeltaByPlayerId: Record<string, number>;
+  gambleDeltaByPlayerId: Record<string, number>;
+  expediencyDeltaByPlayerId?: Record<string, number>;
   commitmentDeltaByPlayerId: Record<string, number>;
 }): RoundResult {
   const finalDeltaByPlayerId: Record<string, number> = {};
+  const expediencyDeltaByPlayerId = args.expediencyDeltaByPlayerId ?? {};
   for (const playerId of args.situation.validPlayerIds) {
     finalDeltaByPlayerId[playerId] =
       (args.adjustedBaseDeltaByPlayerId[playerId] ?? 0) +
       (args.counterDeltaByPlayerId[playerId] ?? 0) +
       (args.fateDeltaByPlayerId[playerId] ?? 0) +
+      (args.gambleDeltaByPlayerId[playerId] ?? 0) +
+      (expediencyDeltaByPlayerId[playerId] ?? 0) +
       (args.commitmentDeltaByPlayerId[playerId] ?? 0);
   }
 
@@ -151,7 +161,10 @@ export function buildFinalRoundResult(args: {
     adjustedBaseDeltaByPlayerId: args.adjustedBaseDeltaByPlayerId,
     shieldDeltaByPlayerId: args.shieldDeltaByPlayerId,
     counterDeltaByPlayerId: args.counterDeltaByPlayerId,
+    mirrorDeltaByPlayerId: args.mirrorDeltaByPlayerId,
     fateDeltaByPlayerId: args.fateDeltaByPlayerId,
+    gambleDeltaByPlayerId: args.gambleDeltaByPlayerId,
+    expediencyDeltaByPlayerId,
     commitmentDeltaByPlayerId: args.commitmentDeltaByPlayerId,
     finalDeltaByPlayerId,
     revealedFactionsByPlayerId: args.situation.judgedFactionByPlayerId,

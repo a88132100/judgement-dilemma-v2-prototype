@@ -161,7 +161,9 @@ function resolveTutorialRound(players: PlayerState[], log: string[]): { result: 
     adjustedBaseDeltaByPlayerId: baseDeltaByPlayerId,
     shieldDeltaByPlayerId: emptyDeltas,
     counterDeltaByPlayerId: emptyDeltas,
+    mirrorDeltaByPlayerId: emptyDeltas,
     fateDeltaByPlayerId: emptyDeltas,
+    gambleDeltaByPlayerId: emptyDeltas,
     commitmentDeltaByPlayerId
   });
   const resolved = applyRoundResult(state, result, BASELINE_RULES_CONFIG);
@@ -637,7 +639,7 @@ export function TutorialScreen({ onBackToTitle, onComplete, onStartGame }: Tutor
         </header>
 
         <section className="tutorial-overlay-card" aria-live="polite">
-          <span>Step {state.step} / 10</span>
+          <span>步驟 {state.step} / 10</span>
           <h2>{currentCopy.title}</h2>
           <p>{currentCopy.body}</p>
         </section>

@@ -34,9 +34,12 @@ export function describeRoundResult(result: RoundResult, players: PlayerState[])
     const parts = [
       `基礎結算 ${result.baseDeltaByPlayerId[playerId] ?? 0}`,
       `庇護修正 ${result.shieldDeltaByPlayerId[playerId] ?? 0}`,
-      `庇護後基礎 ${result.adjustedBaseDeltaByPlayerId[playerId] ?? 0}`,
+      `鏡像修正 ${result.mirrorDeltaByPlayerId[playerId] ?? 0}`,
+      `調整後基礎 ${result.adjustedBaseDeltaByPlayerId[playerId] ?? 0}`,
       `反擊修正 ${result.counterDeltaByPlayerId[playerId] ?? 0}`,
       `宿命修正 ${result.fateDeltaByPlayerId[playerId] ?? 0}`,
+      `賭命修正 ${result.gambleDeltaByPlayerId[playerId] ?? 0}`,
+      `權宜牌修正 ${result.expediencyDeltaByPlayerId[playerId] ?? 0}`,
       `承諾修正：${commitmentText}`
     ];
     const chosenText = player?.chosenFaction ? `原始選擇 ${factionLabel(player.chosenFaction)}` : '原始選擇未記錄';

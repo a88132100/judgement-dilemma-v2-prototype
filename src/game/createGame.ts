@@ -1,17 +1,18 @@
 import { createDeck, drawCards, shuffleDeck } from './deck';
-import { DEFAULT_OPPONENTS, type OpponentMetadata } from './opponents';
+import { DEFAULT_OPPONENTS, DEFAULT_SELECTED_OPPONENTS, type OpponentMetadata } from './opponents';
 import { BASELINE_RULES_CONFIG, type RulesConfig } from './rulesConfig';
 import type { BotPersonality, GameState, PlayerState } from './types';
 
-const botPersonalities: BotPersonality[] = ['honest', 'opportunist', 'observer'];
+const botCount = 3;
+const fallbackBotPersonalities: BotPersonality[] = ['honest', 'opportunist', 'observer'];
 
 export function createInitialPlayers(
   deck: ReturnType<typeof createDeck>,
   rulesConfig: RulesConfig = BASELINE_RULES_CONFIG,
-  opponents: readonly OpponentMetadata[] = DEFAULT_OPPONENTS
+  opponents: readonly OpponentMetadata[] = DEFAULT_SELECTED_OPPONENTS
 ): { players: PlayerState[]; deck: ReturnType<typeof createDeck> } {
   let nextDeck = deck;
-  const resolvedOpponents = botPersonalities.map((_, index) => opponents[index] ?? DEFAULT_OPPONENTS[index]);
+  const resolvedOpponents = Array.from({ length: botCount }, (_, index) => opponents[index] ?? DEFAULT_SELECTED_OPPONENTS[index] ?? DEFAULT_OPPONENTS[index]);
   const names = ['你', ...resolvedOpponents.map((opponent) => opponent.name)];
   const players = names.map((name, index): PlayerState => {
     const drawResult = drawCards(nextDeck, rulesConfig.initialHandSize);
@@ -20,8 +21,15 @@ export function createInitialPlayers(
     return {
       id: `player-${index + 1}`,
       name,
+      displayName: name,
       isHuman: index === 0,
-      botPersonality: index === 0 ? undefined : opponent?.personality ?? botPersonalities[index - 1],
+      opponentId: opponent?.id,
+      opponentTitle: opponent?.title,
+      avatar: opponent?.avatar,
+      seat: opponent?.seat,
+      profile: opponent?.profile,
+      botPersonality: index === 0 ? undefined : opponent?.personality ?? fallbackBotPersonalities[index - 1],
+      botProfileId: opponent?.botProfileId,
       judgmentPoints: rulesConfig.startingJudgmentPoints,
       isEliminated: false,
       hand: drawResult.drawn,
@@ -37,7 +45,7 @@ export function createGame(
 ): GameState {
   const rulesConfig = options.rulesConfig ?? BASELINE_RULES_CONFIG;
   const shuffledDeck = shuffleDeck(createDeck(), rng);
-  const { players, deck } = createInitialPlayers(shuffledDeck, rulesConfig, options.opponents ?? DEFAULT_OPPONENTS);
+  const { players, deck } = createInitialPlayers(shuffledDeck, rulesConfig, options.opponents ?? DEFAULT_SELECTED_OPPONENTS);
   return {
     players,
     round: 1,

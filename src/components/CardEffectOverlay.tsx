@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import type { PlayerState } from '../game/types';
 import { cardImageByType } from './assetMap';
+import { useDialogFocus } from './useDialogFocus';
 
 interface CardEffectOverlayProps {
   confirmed: boolean;
@@ -29,13 +30,14 @@ export function CardEffectOverlay({
   onSwitchFaction,
   onTargetChange
 }: CardEffectOverlayProps) {
+  const dialogRef = useDialogFocus(isOpen);
   if (!isOpen) {
     return null;
   }
 
   const overlay = (
-    <div className="card-effect-backdrop" role="presentation">
-      <section className="card-effect-panel" role="dialog" aria-modal="true" aria-label="真理之眼觸發">
+    <div className="card-effect-backdrop tribunal-modal-backdrop tribunal-effect-backdrop" role="presentation">
+      <section ref={dialogRef} tabIndex={-1} className="card-effect-panel tribunal-modal tribunal-card-effect" role="dialog" aria-modal="true" aria-label="真理之眼觸發">
         <div className="card-effect-heading">
           <span>公開功能牌</span>
           <strong>真理之眼觸發</strong>

@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { cardBackImage, cardImageByType, commitmentTokenImageByFaction, factionCardImageByFaction } from './assetMap';
 import { getCardDetail, type CardDetailTarget } from './cardDetails';
+import { useDialogFocus } from './useDialogFocus';
 
 interface CardDetailPanelProps {
   target: CardDetailTarget;
@@ -23,21 +23,11 @@ function imageForTarget(target: CardDetailTarget): string {
 
 export function CardDetailPanel({ target, onClose }: CardDetailPanelProps) {
   const detail = getCardDetail(target);
-
-  useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  const dialogRef = useDialogFocus(true, onClose);
 
   const modal = (
-    <div className="card-detail-backdrop" onClick={onClose}>
-      <aside className="card-detail-panel" role="dialog" aria-modal="true" aria-label={`${detail.name} 詳細資訊`} onClick={(event) => event.stopPropagation()}>
+    <div className="card-detail-backdrop tribunal-modal-backdrop tribunal-detail-backdrop" onClick={onClose}>
+      <aside ref={dialogRef} tabIndex={-1} className="card-detail-panel tribunal-modal tribunal-card-detail" role="dialog" aria-modal="true" aria-label={`${detail.name} 詳細資訊`} onClick={(event) => event.stopPropagation()}>
         <button className="card-detail-close" type="button" onClick={onClose} aria-label="關閉卡牌資訊">
           關閉
         </button>

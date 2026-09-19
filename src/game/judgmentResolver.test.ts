@@ -98,7 +98,22 @@ describe('judgmentResolver', () => {
     expect(commitment).toEqual({ p1: COMMITMENT_DELTAS.kept, p2: COMMITMENT_DELTAS.broken, p3: COMMITMENT_DELTAS.broken, p4: COMMITMENT_DELTAS.kept });
   });
 
-  it('RoundResult 會合併基礎、宿命、反擊與承諾加扣分', () => {
+  it('混沌導致原本守諾玩家變成失信時，承諾修正為 0', () => {
+    const testPlayers = players(['betrayal', 'alliance'], ['alliance', 'alliance']);
+    testPlayers[0] = {
+      ...testPlayers[0],
+      chosenFaction: 'alliance',
+      judgedFaction: 'betrayal',
+      chaosTargetedThisRound: true
+    };
+    const situation = getRoundSituation(testPlayers);
+    const commitment = resolveCommitmentDelta(testPlayers, situation);
+
+    expect(commitment.p1).toBe(0);
+    expect(commitment.p2).toBe(COMMITMENT_DELTAS.kept);
+  });
+
+  it('RoundResult 會合併基礎、宿命、反擊、權宜牌與承諾加扣分', () => {
     const testPlayers = players(['alliance', 'betrayal']);
     const situation = getRoundSituation(testPlayers);
     const state = { players: testPlayers, round: 1 } as GameState;
@@ -109,11 +124,14 @@ describe('judgmentResolver', () => {
       adjustedBaseDeltaByPlayerId: { p1: 0, p2: -1 },
       shieldDeltaByPlayerId: { p1: 1, p2: 0 },
       counterDeltaByPlayerId: { p1: 0, p2: -1 },
+      mirrorDeltaByPlayerId: { p1: 0, p2: 0 },
       fateDeltaByPlayerId: { p1: 2, p2: 0 },
+      gambleDeltaByPlayerId: { p1: 0, p2: 0 },
+      expediencyDeltaByPlayerId: { p1: 1, p2: -1 },
       commitmentDeltaByPlayerId: { p1: 1, p2: 1 }
     });
 
-    expect(result.finalDeltaByPlayerId).toEqual({ p1: 3, p2: -1 });
+    expect(result.finalDeltaByPlayerId).toEqual({ p1: 4, p2: -2 });
   });
 
   it('全員同輪出局時會觸發 allEliminatedTieBreak 並選最高分者', () => {
@@ -138,7 +156,9 @@ describe('judgmentResolver', () => {
       adjustedBaseDeltaByPlayerId: { p1: -3, p2: -3 },
       shieldDeltaByPlayerId: { p1: 0, p2: 0 },
       counterDeltaByPlayerId: { p1: 0, p2: 0 },
+      mirrorDeltaByPlayerId: { p1: 0, p2: 0 },
       fateDeltaByPlayerId: { p1: 0, p2: 0 },
+      gambleDeltaByPlayerId: { p1: 0, p2: 0 },
       commitmentDeltaByPlayerId: { p1: 0, p2: 0 }
     });
     const nextState = applyRoundResult(state, result);
@@ -171,7 +191,9 @@ describe('judgmentResolver', () => {
       adjustedBaseDeltaByPlayerId: { p1: -3, p2: -3 },
       shieldDeltaByPlayerId: { p1: 0, p2: 0 },
       counterDeltaByPlayerId: { p1: 0, p2: 0 },
+      mirrorDeltaByPlayerId: { p1: 0, p2: 0 },
       fateDeltaByPlayerId: { p1: 0, p2: 0 },
+      gambleDeltaByPlayerId: { p1: 0, p2: 0 },
       commitmentDeltaByPlayerId: { p1: 0, p2: 0 }
     });
     const nextState = applyRoundResult(state, result);
@@ -204,7 +226,9 @@ describe('judgmentResolver', () => {
       adjustedBaseDeltaByPlayerId: { p1: 2, p2: 2 },
       shieldDeltaByPlayerId: { p1: 0, p2: 0 },
       counterDeltaByPlayerId: { p1: 0, p2: 0 },
+      mirrorDeltaByPlayerId: { p1: 0, p2: 0 },
       fateDeltaByPlayerId: { p1: 0, p2: 0 },
+      gambleDeltaByPlayerId: { p1: 0, p2: 0 },
       commitmentDeltaByPlayerId: { p1: 0, p2: 0 }
     });
     const nextState = applyRoundResult(state, result);
@@ -238,7 +262,9 @@ describe('elimination and game end checks', () => {
       adjustedBaseDeltaByPlayerId: { p1: -1, p2: -1 },
       shieldDeltaByPlayerId: { p1: 0, p2: 0 },
       counterDeltaByPlayerId: { p1: 0, p2: 0 },
+      mirrorDeltaByPlayerId: { p1: 0, p2: 0 },
       fateDeltaByPlayerId: { p1: 0, p2: 0 },
+      gambleDeltaByPlayerId: { p1: 0, p2: 0 },
       commitmentDeltaByPlayerId: { p1: -1, p2: 1 }
     });
     const nextState = applyRoundResult(state, result);

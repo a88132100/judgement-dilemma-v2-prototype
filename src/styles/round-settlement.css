@@ -1,0 +1,123 @@
+/* 回合結算使用獨立原生對話框；不依賴牌桌的尺寸、裁切或樣式重設。 */
+.round-settlement-dialog {
+  --settlement-gold: #d4b97f;
+  --settlement-ink: #f1e7d1;
+  --settlement-muted: #b9b5a9;
+  width: min(940px, calc(100vw - 40px));
+  max-width: none;
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  padding: 0;
+  border: 1px solid #9c8151;
+  border-radius: 7px;
+  color: var(--settlement-ink);
+  background: radial-gradient(ellipse at 50% 0, #2a3028, transparent 65%), #0b1215;
+  box-shadow: 0 28px 100px #000d, inset 0 0 0 3px #d5b6780c;
+  font: 14px/1.55 "Microsoft JhengHei", "PingFang TC", sans-serif;
+  overflow: hidden;
+}
+.round-settlement-dialog[open] { display: flex; flex-direction: column; }
+.round-settlement-dialog:not([open]) { display: none; }
+.round-settlement-dialog::backdrop { background: #02060bc9; backdrop-filter: blur(5px); }
+.round-settlement-dialog *, .round-settlement-dialog *::before, .round-settlement-dialog *::after { box-sizing: border-box; }
+.round-settlement-dialog :is(h2, h3, p, dl, dd) { margin: 0; }
+.round-settlement-dialog :is(button, summary):focus-visible { outline: 2px solid #ace2ee; outline-offset: 4px; }
+.round-settlement-header { flex: 0 0 auto; text-align: center; padding: 18px 28px 16px; border-bottom: 1px solid #d0b37436; }
+.round-settlement-header .tribunal-plaque { max-width: 600px; margin: 0 auto 12px; }
+.round-settlement-header p { color: #d4cbb7; font-size: 14px; line-height: 1.7; max-width: 740px; margin: auto; }
+.round-settlement-results { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 16px 24px; display: grid; align-content: start; gap: 10px; }
+.round-settlement-player { border: 1px solid #82715354; border-radius: 3px; background: #0e181cc4; padding: 12px 16px 9px; }
+.round-settlement-player.is-human { border-color: #d3b37a; background: linear-gradient(90deg,#5946263d,#172326); box-shadow: inset 3px 0 #d3b37a; }
+.round-settlement-player-main { display: grid; grid-template-columns: minmax(140px, 1.2fr) minmax(250px, 1.7fr) 125px 64px; align-items: center; gap: 16px; }
+.round-settlement-player-name h3 { color: var(--settlement-ink); font-size: 15px; font-weight: 600; }
+.round-settlement-player-name small { display: block; font-size: 11px; color: #d9aaa0; margin-top: 3px; }
+.round-settlement-you { display: block; color: #e2c590; font-size: 10px; letter-spacing: .15em; margin-bottom: 2px; }
+.round-settlement-factions { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.round-settlement-factions dt, .round-settlement-score > span { color: var(--settlement-muted); font-size: 10px; margin-bottom: 3px; }
+.round-settlement-factions dd { font-size: 15px; }
+.round-settlement-dialog .is-alliance { color: #a9dce7; }
+.round-settlement-dialog .is-betrayal { color: #f0b0a2; }
+.round-settlement-score { text-align: center; }
+.round-settlement-score > div { display: flex; align-items: baseline; justify-content: center; gap: 9px; font: 23px/1.2 Georgia,serif; }
+.round-settlement-score > div > span:first-child { color: #beb8a8; }
+.round-settlement-score > div > span:nth-child(2) { font: 14px/1 sans-serif; color: #b6a681; }
+.round-settlement-score strong { font-weight: 400; color: #f7eacb; }
+.round-settlement-delta { text-align: right; font: 35px/1.2 Georgia,serif; }
+.round-settlement-dialog .is-gain, .round-settlement-dialog .positive-delta { color: #acd9b5; }
+.round-settlement-dialog .is-loss, .round-settlement-dialog .negative-delta { color: #efad9d; }
+.round-settlement-dialog .is-neutral { color: #c2bbac; }
+.round-settlement-details { margin-top: 8px; }
+.round-settlement-details > summary { cursor: pointer; width: fit-content; color: #cdb889; font-size: 11px; padding: 3px 0; }
+.round-settlement-details > summary::marker { color: #ad945f; }
+.round-settlement-details[open] > summary { margin-bottom: 10px; }
+.round-settlement-dialog .score-breakdown-panel { padding: 14px 16px; border: 0; border-radius: 2px; background: #040b0fb3; box-shadow: none; color: #ddd4bf; display: grid; gap: 13px; }
+.round-settlement-dialog .score-breakdown-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.round-settlement-dialog .score-breakdown-heading strong { font-size: 14px; }
+.round-settlement-dialog .score-breakdown-panel dl { display: grid; gap: 9px; }
+.round-settlement-dialog .score-breakdown-panel dl > div { display: grid; grid-template-columns: 132px minmax(0,1fr); align-items: baseline; gap: 16px; }
+.round-settlement-dialog .score-breakdown-panel dt { color: #cbb88d; font-size: 12px; font-weight: 400; }
+.round-settlement-dialog .score-breakdown-panel dd { color: #e2d9c3; font-size: 13px; line-height: 1.8; }
+.round-settlement-dialog .score-breakdown-panel .score-breakdown-reason { border-bottom: 1px solid #a68d5440; padding-bottom: 9px; }
+.round-settlement-dialog .score-breakdown-panel .score-breakdown-reason dd { color: #c7c3b7; }
+.round-settlement-footer { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 17px 24px; border-top: 1px solid #d0b37436; background: #0a1114; }
+.round-settlement-reading { display: grid; gap: 9px; min-width: 0; max-width: 440px; flex: 1; color: #c8c2b1; font-size: 12px; }
+.round-settlement-progress { height: 3px; overflow: hidden; background: #393831; }
+.round-settlement-progress > span { display: block; height: 100%; background: #d3b273; }
+.round-settlement-actions { display: flex; gap: 12px; flex-shrink: 0; }
+.round-settlement-dialog button { cursor: pointer; font: 600 13px/1.4 "Microsoft JhengHei", "PingFang TC", sans-serif; letter-spacing: .07em; min-height: 44px; padding: 10px 20px; border: 1px solid #8a7653; border-radius: 2px; box-shadow: none; }
+.round-settlement-dialog button:disabled { opacity: .5; cursor: not-allowed; }
+.round-settlement-dialog .round-settlement-pause { background: #152125; color: #ddcca9; }
+.round-settlement-dialog .round-settlement-continue { color: #251c0f; background: linear-gradient(180deg,#ead099,#bea063); border-color: #e7c78b; min-width: 130px; }
+.round-settlement-dialog button:hover:not(:disabled) { border-color: #ffe4af; filter: brightness(1.08); }
+/* 先閱讀同一份裁決的卡牌經過，再顯示點數；戰報保留實體卡圖與少量敘述。 */
+.round-card-report { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 20px 30px; }
+.round-card-report-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+.round-card-report-entry { display: grid; grid-template-columns: 65px minmax(0,1fr); gap: 24px; align-items: center; min-height: 104px; padding: 8px 15px 8px 8px; border-bottom: 1px solid #a78b4c36; background: linear-gradient(90deg,#74603a18,transparent 82%); }
+.round-card-report-entry.is-human { background: linear-gradient(90deg,#c6a06324,transparent 90%); }
+.round-card-report-art { position: relative; width: 58px; transform: rotate(-4deg); }
+.round-card-report-entry:nth-child(even) .round-card-report-art { transform: rotate(4deg); }
+.round-card-report-art img { display: block; width: 58px; height: 84px; object-fit: cover; border: 1px solid #a18a5d; border-radius: 4px; box-shadow: 2px 4px 9px #0009; }
+.round-card-report-art > span { position: absolute; bottom: -5px; right: -10px; display: grid; place-items: center; width: 25px; height: 25px; border: 1px solid #a18a5d; border-radius: 50%; background: #111c1e; color: #dac394; font: 12px Georgia,serif; }
+.round-card-report-owner { display: flex; flex-wrap: wrap; gap: 8px; color: #b9b6a9; font-size: 11px; }
+.round-card-report-copy h3 { margin: 3px 0 6px; color: #e9d29e; font: 600 23px/1.25 "PMingLiU", "Songti TC",serif; letter-spacing: .1em; }
+.round-card-report-copy p { color: #e7dfcc; font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
+.round-card-report-empty { min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 20px; }
+.round-card-report-empty > span { color: #c5aa72; font: 42px/1 Georgia,serif; }
+.round-card-report-empty h3 { color: #ebd5a9; font: 23px/1.4 "PMingLiU",serif; }
+.round-card-report-empty p { color: #bcb6a5; font-size: 13px; }
+.round-settlement-header h2:focus { outline: none; }
+/* 核心已完成單次結算，背景點數等戰報讀完才顯示，避免提前透出結果。 */
+.tribunal-board[data-reading-report="true"] :is(.seat-score-row, .self-seat-hud > strong, .seat-eliminated-mark) { visibility: hidden; }
+@media (max-width: 800px) {
+  .round-settlement-player-main { grid-template-columns: minmax(0,1fr) 95px 55px; gap: 9px; }
+  .round-settlement-factions { grid-row: 2; grid-column: 1 / -1; padding-top: 8px; gap: 18px; }
+  .round-settlement-player-name { grid-column: 1; }
+  .round-settlement-score { grid-column: 2; }
+  .round-settlement-delta { grid-column: 3; }
+}
+@media (max-width: 520px) {
+  .round-settlement-dialog { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); }
+  .round-settlement-header { padding: 18px 18px 14px; }
+  .round-settlement-header p { font-size: 12px; }
+  .round-settlement-results { padding: 12px; gap: 10px; }
+  .round-card-report { padding: 14px; }
+  .round-card-report-entry { grid-template-columns: 50px minmax(0,1fr); gap: 17px; padding: 10px 5px; }
+  .round-card-report-art, .round-card-report-art img { width: 46px; }
+  .round-card-report-art img { height: 67px; }
+  .round-card-report-copy h3 { font-size: 21px; }
+  .round-card-report-copy p { font-size: 13px; }
+  .round-card-report-owner { font-size: 10px; gap: 5px; }
+  .round-settlement-player { padding: 11px 12px 8px; }
+  .round-settlement-player-main { grid-template-columns: minmax(0,1fr) 86px 43px; }
+  .round-settlement-player-name h3 { font-size: 13px; }
+  .round-settlement-delta { font-size: 30px; }
+  .round-settlement-score > div { font-size: 21px; gap: 7px; }
+  .round-settlement-factions { gap: 12px; }
+  .round-settlement-factions dd { font-size: 14px; }
+  .round-settlement-footer { flex-direction: column; align-items: stretch; gap: 12px; padding: 13px 16px; }
+  .round-settlement-reading { flex: none; font-size: 11px; }
+  .round-settlement-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .round-settlement-dialog button { padding: 10px 12px; min-width: 0; }
+  .round-settlement-dialog .score-breakdown-panel { padding: 12px; }
+  .round-settlement-dialog .score-breakdown-panel dl > div { grid-template-columns: 1fr; gap: 3px; }
+}

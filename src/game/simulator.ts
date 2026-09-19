@@ -1,7 +1,7 @@
-import { MAX_ROUNDS, MVP_CARD_TYPES, SIMULATION_WARNING_THRESHOLDS } from './constants';
+import { IMPLEMENTED_CARD_TYPES, MAX_ROUNDS, SIMULATION_WARNING_THRESHOLDS } from './constants';
 import * as createGameModule from './createGame';
 import { decideBotCardPlay, decideBotCommitment, decideBotFateDeclaration, decideBotFinalFaction, decideBotPeekFactionSwitch } from './botDecision';
-import { getPeekTargetPlayers, resolvePeekChoice } from './cardResolver';
+import { getChaosTargetPlayers, getPeekTargetPlayers, resolveChaosChoice, resolvePeekChoice } from './cardResolver';
 import { BALANCE_PROFILES, BASELINE_RULES_CONFIG, type BalanceProfile, type RulesConfig } from './rulesConfig';
 import * as stateMachine from './stateMachine';
 import type { BotPersonality, CardType, GameState, HumanPlayInput, PlayerState, RoundResultType } from './types';
@@ -115,8 +115,17 @@ function emptyCardCounts(): Record<CardType, number> {
   return {
     fate: 0,
     peek: 0,
+    chaos: 0,
     shield: 0,
-    counter: 0
+    counter: 0,
+    mirror: 0,
+    gamble: 0,
+    smallGain: 0,
+    promiseTax: 0,
+    favor: 0,
+    consensus: 0,
+    slip: 0,
+    evenOmen: 0
   };
 }
 
@@ -187,7 +196,7 @@ function automateCurrentPhase(state: GameState, rng: () => number, rulesConfig: 
       return stateMachine.advancePhase(state, rng, rulesConfig);
     }
     const chosenFaction = decideBotFinalFaction(state, human, rng);
-    const playedCard = decideBotCardPlay(state, human, rng);
+    const playedCard = decideBotCardPlay(state, human, rng, chosenFaction);
     let nextState = stateMachine.completeHumanPlay(state, toHumanInput(playedCard, chosenFaction), rng);
     if (!nextState.players.find((player) => player.isHuman)?.judgedFaction) {
       nextState = stateMachine.completeHumanPlay(state, { chosenFaction }, rng);
@@ -203,6 +212,15 @@ function automateCurrentPhase(state: GameState, rng: () => number, rulesConfig: 
       if (target) {
         const shouldSwitchFaction = decideBotPeekFactionSwitch(state, human, target, rng);
         return stateMachine.advancePhase(resolvePeekChoice(state, human.id, target.id, shouldSwitchFaction).state, rng, rulesConfig);
+      }
+    }
+    if (human?.playedCard?.type === 'chaos' && !human.hasResolvedChaos) {
+      const targets = getChaosTargetPlayers(state, human.id);
+      const preferredTargets = targets.filter((target) => target.id !== human.id);
+      const targetPool = preferredTargets.length > 0 ? preferredTargets : targets;
+      const target = targetPool[Math.floor(rng() * targetPool.length)];
+      if (target) {
+        return stateMachine.advancePhase(resolveChaosChoice(state, human.id, target.id).state, rng, rulesConfig);
       }
     }
     return stateMachine.advancePhase(state, rng, rulesConfig);
@@ -466,7 +484,7 @@ export function summarizeSimulationGames(states: GameState[]): SimulationResult 
       brokenCommitmentCount: accumulator.brokenCommitmentCount,
       keepRate: accumulator.keptCommitmentCount / Math.max(1, commitmentTotal)
     },
-    cardUsageStats: MVP_CARD_TYPES.reduce<Record<CardType, number>>((stats, card) => {
+    cardUsageStats: IMPLEMENTED_CARD_TYPES.reduce<Record<CardType, number>>((stats, card) => {
       stats[card] = accumulator.cardUsageStats[card];
       return stats;
     }, emptyCardCounts())

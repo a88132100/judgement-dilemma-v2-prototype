@@ -4,6 +4,7 @@ import {
   COUNTER_TARGET_DELTA,
   ELIMINATED_AT_JUDGMENT_POINTS,
   FATE_DELTAS,
+  GAMBLE_DELTAS,
   HAND_LIMIT,
   INITIAL_HAND_SIZE,
   MAX_ROUNDS,
@@ -34,6 +35,10 @@ export interface RulesConfig {
     broken: number;
   };
   fateDeltas: {
+    hit: number;
+    miss: number;
+  };
+  gambleDeltas: {
     hit: number;
     miss: number;
   };
@@ -68,6 +73,7 @@ export const BASELINE_RULES_CONFIG: RulesConfig = {
   },
   commitmentDeltas: { ...COMMITMENT_DELTAS },
   fateDeltas: { ...FATE_DELTAS },
+  gambleDeltas: { ...GAMBLE_DELTAS },
   counterTargetDelta: COUNTER_TARGET_DELTA,
   shieldLossReduction: SHIELD_LOSS_REDUCTION,
   publicCardResolveOrder: [...PUBLIC_CARD_RESOLVE_ORDER]
@@ -100,6 +106,10 @@ export function createRulesConfig(override: RulesConfigOverride = {}): RulesConf
     fateDeltas: {
       ...BASELINE_RULES_CONFIG.fateDeltas,
       ...(override.fateDeltas ?? {})
+    },
+    gambleDeltas: {
+      ...BASELINE_RULES_CONFIG.gambleDeltas,
+      ...(override.gambleDeltas ?? {})
     },
     publicCardResolveOrder: [...((override.publicCardResolveOrder as CardType[] | undefined) ?? BASELINE_RULES_CONFIG.publicCardResolveOrder)]
   };

@@ -1,0 +1,37 @@
+/* 1088px 原圖按實際圓面置中，四周保留安全邊；不重繪、不改動圖片像素。 */
+.commitment-token-art.commitment-token-art {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  pointer-events: none;
+  user-select: none;
+  --token-image-size: 113.4515%;
+  --token-image-left: -7.0386%;
+  --token-image-top: -9.4891%;
+}
+.commitment-token-art[data-commitment="betrayal"] {
+  --token-image-size: 138.0711%;
+  --token-image-left: -17.8934%;
+  --token-image-top: -19.4797%;
+}
+/* 飛行物件複製同一顯示視窗，因此手上、拋出及落桌的圖案比例一致。 */
+:is(.tribunal-board, .tribunal-card-flight) .commitment-token-art.commitment-token-art > img {
+  position: absolute;
+  left: var(--token-image-left);
+  top: var(--token-image-top);
+  display: block;
+  width: var(--token-image-size);
+  height: var(--token-image-size);
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  filter: contrast(1.06);
+  box-shadow: none;
+  outline: none;
+  pointer-events: none;
+}
