@@ -57,14 +57,18 @@ function nextFlowStep(state: GameState, speechIndex: number): FlowStep | undefin
 }
 
 export function useRoundFlow({ gameState, onGameStateChange, paused = false }: RoundFlowOptions) {
+  const phaseKey = `${gameState.round}-${gameState.phase}`;
   const [speechIndex, setSpeechIndex] = useState(0);
   const [discussionPaused, setDiscussionPaused] = useState(false);
   const [documentHidden, setDocumentHidden] = useState(() => document.hidden);
-  const [announcementVisible, setAnnouncementVisible] = useState(gameState.phase !== 'gameEnd');
+  const [announcement, setAnnouncement] = useState({ key: phaseKey, visible: gameState.phase !== 'gameEnd' });
+  // 新階段第一次渲染就先顯示銘牌，避免沿用上一階段的隱藏狀態而閃出第一句。
+  const announcementVisible = gameState.phase !== 'gameEnd' && (announcement.key !== phaseKey || announcement.visible);
   const stopped = paused || documentHidden || (gameState.phase === 'discussion' && discussionPaused);
-  const latestRef = useRef({ gameState, onGameStateChange, paused, documentHidden, stopped });
-  latestRef.current = { gameState, onGameStateChange, paused, documentHidden, stopped };
+  const latestRef = useRef({ gameState, phaseKey, onGameStateChange, paused, documentHidden, stopped });
+  latestRef.current = { gameState, phaseKey, onGameStateChange, paused, documentHidden, stopped };
   const ticketRef = useRef<FlowTicket | undefined>(undefined);
+  const announcementTicketRef = useRef<Omit<FlowTicket, 'state'> | undefined>(undefined);
 
   useEffect(() => {
     const handleVisibility = () => setDocumentHidden(document.hidden);
@@ -75,13 +79,35 @@ export function useRoundFlow({ gameState, onGameStateChange, paused = false }: R
   useEffect(() => {
     setSpeechIndex(0);
     setDiscussionPaused(false);
-    setAnnouncementVisible(gameState.phase !== 'gameEnd');
-    const timeout = window.setTimeout(() => setAnnouncementVisible(false), 1500);
-    return () => window.clearTimeout(timeout);
   }, [gameState.round, gameState.phase]);
 
-  const step = nextFlowStep(gameState, speechIndex);
-  const isPaused = paused || documentHidden || (gameState.phase === 'discussion' && discussionPaused);
+  useEffect(() => {
+    if (gameState.phase === 'gameEnd') {
+      announcementTicketRef.current = undefined;
+      return;
+    }
+    let ticket = announcementTicketRef.current;
+    if (!ticket || ticket.key !== phaseKey) {
+      ticket = { key: phaseKey, remaining: 1500, done: false };
+      announcementTicketRef.current = ticket;
+      setAnnouncement({ key: phaseKey, visible: true });
+    }
+    if (stopped || ticket.done) return;
+    const activeTicket = ticket;
+    const startedAt = performance.now();
+    const timeout = window.setTimeout(() => {
+      if (activeTicket.done || latestRef.current.phaseKey !== phaseKey || latestRef.current.stopped || document.hidden) return;
+      activeTicket.done = true;
+      setAnnouncement({ key: phaseKey, visible: false });
+    }, activeTicket.remaining);
+    return () => {
+      window.clearTimeout(timeout);
+      if (!activeTicket.done) activeTicket.remaining = Math.max(0, activeTicket.remaining - (performance.now() - startedAt));
+    };
+  }, [gameState.phase, phaseKey, stopped]);
+
+  // 銘牌退場後才開始發言計時，第一位也保有完整的閱讀時間。
+  const step = gameState.phase === 'discussion' && announcementVisible ? undefined : nextFlowStep(gameState, speechIndex);
 
   useEffect(() => {
     if (!step) {
@@ -93,7 +119,7 @@ export function useRoundFlow({ gameState, onGameStateChange, paused = false }: R
       ticket = { state: gameState, key: step.key, remaining: step.delay, done: false };
       ticketRef.current = ticket;
     }
-    if (isPaused || ticket.done) return;
+    if (stopped || ticket.done) return;
     const activeTicket = ticket;
     const startedAt = performance.now();
     const timeout = window.setTimeout(() => {
@@ -116,7 +142,7 @@ export function useRoundFlow({ gameState, onGameStateChange, paused = false }: R
       window.clearTimeout(timeout);
       if (!activeTicket.done) activeTicket.remaining = Math.max(0, activeTicket.remaining - (performance.now() - startedAt));
     };
-  }, [gameState, step?.key, step?.action, step?.delay, isPaused]);
+  }, [gameState, step?.key, step?.action, step?.delay, stopped]);
 
   function skipDiscussion() {
     const latest = latestRef.current;
@@ -124,6 +150,7 @@ export function useRoundFlow({ gameState, onGameStateChange, paused = false }: R
     const ticket = ticketRef.current;
     if (ticket?.state === latest.gameState && ticket.done) return;
     if (ticket) ticket.done = true;
+    ticketRef.current = { state: latest.gameState, key: 'skipDiscussion', remaining: 0, done: true };
     latest.onGameStateChange(advancePhase(latest.gameState));
   }
 
@@ -131,6 +158,7 @@ export function useRoundFlow({ gameState, onGameStateChange, paused = false }: R
     speechIndex,
     discussionPaused,
     announcementVisible,
+    announcementPaused: stopped,
     skipDiscussion,
     toggleDiscussionPause: () => setDiscussionPaused((current) => !current)
   };

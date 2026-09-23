@@ -119,6 +119,7 @@ describe('自動回合流程', () => {
 
   it('Bot 逐句發言，暫停保留剩餘時間，連續略過不會跳過兩個階段', () => {
     const flow = mountFlow(fixture('discussion', ['fate']));
+    tick(1500);
     tick(3500);
     expect(flow.controller().speechIndex).toBe(1);
     tick(1000);
@@ -135,6 +136,95 @@ describe('自動回合流程', () => {
     expect(flow.state().phase).toBe('fateDeclare');
     tick(20000);
     expect(flow.state().phase).toBe('fateDeclare');
+  });
+
+  it('先完整顯示階段銘牌，之後三位 Bot 各有完整 3500ms 發言時間', () => {
+    const flow = mountFlow(fixture('discussion', ['fate']));
+    expect(flow.controller().announcementVisible).toBe(true);
+    tick(1499);
+    expect(flow.controller().announcementVisible).toBe(true);
+    expect(flow.controller().speechIndex).toBe(0);
+    expect(flow.transitions).toHaveLength(0);
+    tick(1);
+    expect(flow.controller().announcementVisible).toBe(false);
+    for (let index = 0; index < 3; index += 1) {
+      tick(3499);
+      expect(flow.controller().speechIndex).toBe(index);
+      expect(flow.state().phase).toBe('discussion');
+      tick(1);
+    }
+    expect(flow.transitions).toHaveLength(1);
+    expect(flow.state().phase).toBe('fateDeclare');
+  });
+
+  it('承諾銘牌已退場後進入發言，仍重新顯示銘牌再開始第一句', () => {
+    const flow = mountFlow(fixture('commitment', ['fate']));
+    tick(2000);
+    expect(flow.controller().announcementVisible).toBe(false);
+    flow.replace(submitHumanCommitment(flow.state(), 'alliance', () => 0.37));
+    tick(600);
+    expect(flow.state().phase).toBe('discussion');
+    expect(flow.controller().announcementVisible).toBe(true);
+    tick(1500);
+    expect(flow.controller().announcementVisible).toBe(false);
+    tick(3499);
+    expect(flow.controller().speechIndex).toBe(0);
+    tick(1);
+    expect(flow.controller().speechIndex).toBe(1);
+  });
+
+  it('銘牌等待期間開啟視窗或隱藏分頁會暫停，恢復後第一句仍有完整閱讀時間', () => {
+    const flow = mountFlow(fixture('discussion', ['fate']));
+    tick(600);
+    flow.pause(true);
+    expect(flow.controller().announcementPaused).toBe(true);
+    tick(20000);
+    expect(flow.controller().announcementVisible).toBe(true);
+    flow.pause(false);
+    tick(400);
+    act(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    tick(20000);
+    expect(flow.controller().announcementVisible).toBe(true);
+    expect(flow.controller().speechIndex).toBe(0);
+    act(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    tick(499);
+    expect(flow.controller().announcementVisible).toBe(true);
+    tick(1);
+    expect(flow.controller().announcementVisible).toBe(false);
+    expect(flow.controller().announcementPaused).toBe(false);
+    tick(3499);
+    expect(flow.controller().speechIndex).toBe(0);
+    tick(1);
+    expect(flow.controller().speechIndex).toBe(1);
+  });
+
+  it('銘牌等待期間略過、重開或卸載都不留下舊發言排程', () => {
+    const flow = mountFlow(fixture('discussion', ['fate']));
+    tick(500);
+    act(() => { flow.controller().skipDiscussion(); flow.controller().skipDiscussion(); });
+    expect(flow.transitions).toHaveLength(1);
+    tick(20000);
+    expect(flow.state().phase).toBe('fateDeclare');
+    expect(flow.transitions).toHaveLength(1);
+
+    flow.replace({ ...fixture('discussion', ['fate']), round: 2 });
+    tick(600);
+    const restarted = fixture('commitment', ['fate']);
+    flow.replace(restarted);
+    tick(20000);
+    expect(flow.state()).toBe(restarted);
+    expect(flow.transitions).toHaveLength(1);
+    flow.replace(fixture('discussion', ['fate']));
+    tick(600);
+    flow.unmount();
+    tick(20000);
+    expect(flow.transitions).toHaveLength(1);
   });
 
   it('外部視窗和隱藏分頁都凍結計時，恢復後只用剩餘時間', () => {

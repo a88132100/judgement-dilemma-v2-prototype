@@ -329,15 +329,11 @@
 .tribunal-board[data-phase="gameEnd"] .player-foreground { pointer-events: none; }
 @keyframes tribunal-reveal { from { opacity: .25; transform: scaleX(.45) translateY(5px); } to { opacity: 1; transform: none; } }
 
-/* 大螢幕增加坐姿角色與卡面的大小，仍保留桌面留白。 */
+/* 大螢幕只調整前景與文字；角色及桌牌由下方共用的場景座標定位。 */
 @media (min-height: 880px) and (min-width: 1181px) {
   .tribunal-board { --hand-height: 280px; }
-  .tribunal-board .tribunal-opponent-seat { width: 360px; height: 375px; }
-  .tribunal-board .seat-top { width: 295px; height: 305px; top: -5px; }
   .tribunal-board .seat-score-row strong { font-size: 34px; }
-  .tribunal-board .seat-nameplate h3 { font-size: 22px; }
-  .tribunal-seat-card-stack.seat-stack-top { top: 320px; }
-  .tribunal-table-card { width: 94px; height: 134px; }
+  .tribunal-board .seat-nameplate h3 { font-size: 18px; }
   .tribunal-board .central-judgement-ui { top: 35%; }
   .tribunal-board .tribunal-self-seat { height: 175px; }
   .tribunal-board .phase-quick-hint, .tribunal-board .stage-title small { font-size: 13px; }
@@ -364,6 +360,78 @@
   .tribunal-seat-card-stack.seat-stack-right { left: 81%; }
   .tribunal-board .bot-speech-card { grid-template-columns: 100px 1fr; padding: 7px; }
   .tribunal-board .bot-speech-card p { font-size: 11px; }
+}
+/* 原背景、桌緣遮擋與座位共用 1672×941 美術座標，不再各自放大或偏移。 */
+.tribunal-table-foreground { display: none; }
+.tribunal-scene-clips { position: absolute; width: 0; height: 0; pointer-events: none; }
+@media (min-width: 761px) {
+  .tribunal-board .tribunal-scene {
+    container-type: size;
+    --art-height: max(56.2799cqw, 100cqh);
+    --art-width: max(100cqw, 177.6833cqh);
+    --art-left: calc((100cqw - var(--art-width)) / 2);
+    --art-top: calc((100cqh - var(--art-height)) * .3);
+    --far-rim: calc(var(--art-top) + var(--art-height) * .247);
+    --table-card-height: clamp(100px, 15cqh, 134px);
+    --own-card-height: clamp(110px, 17cqh, 132px);
+    --far-card-top: calc(var(--far-rim) + 90px);
+    --own-card-top: calc(var(--far-card-top) + var(--table-card-height) + 40px);
+    background-position: center 30%;
+  }
+  .tribunal-board .tribunal-scene::before { background: none; }
+  .tribunal-board .tribunal-table-foreground {
+    display: block; position: absolute; pointer-events: none; z-index: 2;
+    left: var(--art-left); top: var(--art-top); width: var(--art-width); height: var(--art-height);
+    background: var(--tribunal-scene-bg) center / 100% 100% no-repeat;
+    clip-path: url(#tribunal-table-edge);
+  }
+  .tribunal-board .tribunal-opponent-seat {
+    --seat-width: clamp(190px, min(18cqw, 34cqh), 340px);
+    --seat-center: 13cqw;
+    --seat-base: calc(var(--art-top) + var(--art-height) * .39);
+    z-index: auto; width: var(--seat-width); height: var(--seat-width);
+    left: calc(var(--seat-center) - var(--seat-width) / 2);
+    top: calc(var(--seat-base) - var(--seat-width)); transform: none;
+  }
+  .tribunal-board .seat-right { --seat-center: 87cqw; }
+  .tribunal-board .seat-top {
+    --seat-center: 50cqw; --seat-width: clamp(170px, min(14cqw, 26cqh), 270px);
+    --seat-base: calc(var(--far-rim) + var(--art-height) * .055);
+  }
+  .tribunal-board .seated-character-stage { z-index: 1; }
+  .tribunal-board .seated-character-stage::after { content: none; }
+  .tribunal-board .seated-player-plaque {
+    z-index: 4; top: calc(var(--seat-width) - var(--art-height) * .055 + 6px);
+    bottom: auto;
+  }
+  .tribunal-board .seat-top .seated-player-plaque { bottom: auto; }
+  .tribunal-board .seat-card.is-eliminated { opacity: 1; filter: none; }
+  .tribunal-board .seat-card.is-eliminated :is(.seated-character-stage, .seated-player-plaque) { opacity: .55; filter: grayscale(1); }
+  .tribunal-seat-card-stack.seat-stack-top { top: var(--far-card-top); }
+  .tribunal-seat-card-stack:is(.seat-stack-left, .seat-stack-right) { top: calc(var(--art-top) + var(--art-height) * .335 + 165px); }
+  .tribunal-seat-card-stack.seat-stack-left { left: 20%; }
+  .tribunal-seat-card-stack.seat-stack-right { left: 80%; }
+  .tribunal-table-card { width: calc(var(--table-card-height) * .7); height: var(--table-card-height); }
+  .tribunal-board .tribunal-your-table { top: var(--own-card-top); height: var(--own-card-height); gap: 24px; }
+  .tribunal-board .table-cast-landing { width: calc(var(--own-card-height) * .686); height: var(--own-card-height); }
+  .tribunal-board .placed-card > span:not(.commitment-token-art) { bottom: -14px; }
+  .tribunal-board .player-foreground { --card-width: clamp(82px, min(7.5cqw, 14cqh), 144px); }
+  .tribunal-deck-piles { top: 72%; }
+  .tribunal-board .central-judgement-ui { top: calc(var(--far-rim) + 65px); }
+  .tribunal-board:is([data-phase="commitment"], [data-phase="playCards"]) .central-judgement-ui { top: calc(var(--far-rim) + 100px); }
+}
+/* 中型視窗將整張桌面配合可用比例，避免裁切後左右桌緣跑出畫面。 */
+@media (min-width: 761px) and (max-width: 1180px) {
+  html:has(.tribunal-board), body:has(.tribunal-board), #root:has(.tribunal-board) { height: auto; min-height: 100dvh; max-height: none; overflow: visible; }
+  .tribunal-board { min-height: 900px; }
+  .tribunal-board .tribunal-scene { --art-width: 100cqw; --art-height: 100cqh; --table-card-height: clamp(100px, 13cqh, 120px); background-size: 100% 100%; }
+  .tribunal-board .tribunal-scene { --far-card-top: calc(var(--art-height) * .335 + 90px); }
+  .tribunal-board .tribunal-opponent-seat { --seat-width: 190px; }
+  .tribunal-board .seat-top { --seat-width: 170px; }
+  .tribunal-seat-card-stack { gap: 10px; }
+  .tribunal-seat-card-stack.seat-stack-left { left: 16%; top: var(--far-card-top); transform: translateX(-50%) rotate(3deg); }
+  .tribunal-seat-card-stack.seat-stack-right { left: 84%; top: var(--far-card-top); transform: translateX(-50%) rotate(-3deg); }
+  .tribunal-board .player-foreground { --card-width: 78px; }
 }
 /* 窄螢幕使用直向桌面；內容自然捲動，不將桌機畫面等比縮小。 */
 @media (max-width: 760px) {

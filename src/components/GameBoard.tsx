@@ -141,6 +141,14 @@ export function GameBoard({ gameState, onGameStateChange, onBackToTitle, onResta
             <PlayerPanel key={player.id} player={player} dealerPlayerId={gameState.dealerPlayerId} phase={gameState.phase}
               seatPosition={seatPositions[index]} visualStyle="alpha" showTableCards={false} />
           ))}
+          <svg className="tribunal-scene-clips" width="0" height="0" aria-hidden="true">
+            <defs>
+              <clipPath id="tribunal-table-edge" clipPathUnits="objectBoundingBox">
+                <path d="M0 .48 C0 .33 .23 .247 .5 .247 C.77 .247 1 .33 1 .48 V1 H0Z" />
+              </clipPath>
+            </defs>
+          </svg>
+          <div className="tribunal-table-foreground" aria-hidden="true" />
           <TableSeatSlots players={opponents} phase={gameState.phase} />
           <div className="tribunal-deck-piles" aria-label={`牌庫 ${gameState.deck.length} 張，棄牌 ${gameState.discardPile.length} 張`}>
             <div className="tribunal-draw-pile"><span aria-hidden="true" /><strong>{gameState.deck.length}</strong><small>牌庫</small></div>

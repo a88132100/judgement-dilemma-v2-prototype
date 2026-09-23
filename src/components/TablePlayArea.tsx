@@ -85,7 +85,7 @@ export function TablePlayArea({ gameState, onGameStateChange, flowPaused = false
     [gameState.players, gameState.round]
   );
   const pendingHumanPeek = gameState.phase === 'resolvePublicCards' && !human?.isEliminated && human?.playedCard?.type === 'peek' && !human.hasResolvedPeek;
-  const { speechIndex, discussionPaused, announcementVisible, skipDiscussion, toggleDiscussionPause } = useRoundFlow({
+  const { speechIndex, discussionPaused, announcementVisible, announcementPaused, skipDiscussion, toggleDiscussionPause } = useRoundFlow({
     gameState,
     onGameStateChange,
     paused: flowPaused || Boolean(inspectedCard) || pendingHumanPeek
@@ -687,7 +687,7 @@ export function TablePlayArea({ gameState, onGameStateChange, flowPaused = false
 
   function renderStageCenter() {
     if (gameState.phase === 'discussion') {
-      return renderDiscussionStage();
+      return announcementVisible ? null : renderDiscussionStage();
     }
     if (canDeclareFate && humanPlayer.hand.includes('fate')) {
       return renderFateDeclareStage();
@@ -724,7 +724,7 @@ export function TablePlayArea({ gameState, onGameStateChange, flowPaused = false
       <DropZone active={canChooseCommitment || canChoosePlay} title="審判牌桌" hint={canChooseCommitment ? '點選印記或拖到桌面立誓' : '點選手牌或拖到桌面出牌'} onDropPayload={handleTableDrop}>
         <div className={`central-judgement-ui alpha-center-stage phase-${gameState.phase}${stageCenter ? ' has-stage-content' : ''}`}>
           {announcementVisible && gameState.phase !== 'resolveJudgment' && gameState.phase !== 'gameEnd' ? (
-            <div className="stage-announcement" role="status" aria-atomic="true" key={`${gameState.round}-${gameState.phase}`}>
+            <div className="stage-announcement" role="status" aria-atomic="true" key={`${gameState.round}-${gameState.phase}`} style={{ animationPlayState: announcementPaused ? 'paused' : 'running' }}>
               <TribunalPlaque>
                 <span className="tribunal-plaque-kicker">第 {String(gameState.round).padStart(2, '0')} 回合</span>
                 <strong className="tribunal-plaque-title">{PHASE_LABELS[gameState.phase]}</strong>

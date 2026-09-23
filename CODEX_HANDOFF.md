@@ -6,7 +6,37 @@
 
 ## Current Phase
 
-Polish / 保留原圖的承諾 Token 清晰度改善完成並通過驗收（2026-09-19）。原始 PNG、規則、戰報與階段流程保留；只調整原圖的顯示視窗、大小、對比與拖曳承載。
+Polish / 牌桌與發言修正完成；真理之眼下拉選單可讀性修正通過本機驗收（2026-09-23）。原始素材與遊戲規則保持不變；本次依使用者指示將累積修正同步至 GitHub `origin/main`。
+
+## GitHub Synchronization — 2026-09-23
+
+- 使用者已授權提交與推送目前全部改動：桌緣角色遮擋、跨席位出牌間距、發言銘牌與對話順序、真理之眼下拉選單配色，以及測試與交接文件。
+- 同步前本機 `main` 與最新遠端 `origin/main` 一致。沿用既有忽略規則，不納入 `artifacts/`、`dist/`、`node_modules/` 等本機產物。
+- 既有驗證涵蓋 136 項測試、10 種尺寸 39 個布局情境、發言／拖曳／查驗流程與正式建置；下列各交付節的「未提交或推送」是當時狀態，已由本次同步取代。
+- 本次執行 GitHub 同步；若 Vercel 設有 Git 自動部署，推送可能觸發該流程，尚未驗證線上部署結果。
+
+## Latest Peek Dropdown Fix — 2026-09-23
+
+- 使用者回報真理之眼下拉選項只有反白列看得見。根因是 `global.css` 的 `option` 指定深色文字，原生選單卻沿用深色底。
+- `src/styles/global.css`：`select` 明確使用 `color-scheme: dark`；`option` 指定淺色字 `#edf2ef` 與深色底 `#10191c`，保留原生反白與鍵盤操作，未更動目標名單或規則。
+- `node artifacts/visual-checks/tribunal-autoflow.cjs peek` 通過：三位可查驗對手完整姓名、未選中選項對比至少 4.5:1、逐一選取、鍵盤切換、确认後鎖定目標、私查結果與後續換陣營流程。實際展開清單截圖 `artifacts/visual-checks/tribunal-autoflow/peek-dropdown-readable.png` 已目視確認三列可讀。
+- `npm run build` 通過，JS `index-Co2doCYc.js`、CSS `index-CHV9y30x.css`。本次只有樣式修正，未新增或重跑規則單元測試；開發站 5175 可重新整理驗收，未提交、推送或部署。
+
+## Latest Table Layout And Discussion Fix — 2026-09-22
+
+使用者指出正式站人物像放在桌上、對面的牌與己方桌牌交疊，以及發言銘牌與第一句同時出現導致文字框先下後上；已明確授權修改。
+
+- 根因：880px 高度斷點突然放大人物並將對面牌堆推至 320px，而己方仍採場景高度 51.5%；1920×910 滿桌可重現約 42px 交疊。舊 QA 未量測不同玩家桌牌彼此的旋轉外框；本次補上跨席位、Token 與文字標籤量測。
+- `GameBoard.tsx`、`tribunal-board.css`：桌機背景、角色與桌緣遮擋共用 1672×941 美術座標。使用原背景加 SVG 桌緣裁切遮住角色下半身，角色名牌保持在遮擋前方；没有重繪或新增圖片資產。
+- 雙方出牌位置共用遠桌緣、牌高與安全間距，移除造成跳位的放大定位；手牌尺寸同時受可用高度限制，牌下標籤縮短距離，牌庫移到右下避開對手牌。Token 維持上一版原圖裁切與大小。
+- 761–1180px 中型視窗使用完整桌面比例與至少 900px 可捲動高度，三席牌堆採同列排列。手機仍使用原直向捲動布局；不強行把完整桌面壓縮到矮視窗內。
+- `useRoundFlow.ts`、`TablePlayArea.tsx`：發言先顯示 1500ms 銘牌，退場後才顯示第一句並開始每位完整 3500ms 計時。銘牌與發言互斥，第一句不再被標題推低。開啟閱讀視窗與隱藏分頁保留剩餘時間，銘牌動畫同步暫停；略過、重開與卸載清除舊排程。
+- `useRoundFlow.test.tsx` 新增 4 項時序回歸。`npm run test`：9 檔 136 項全部通過；`npm run build` 通過，JS `index-DhcljCDd.js`、CSS `index-B8x98T5D.css`。
+- `node artifacts/visual-checks/seat-layout-regression.cjs`：10 個尺寸、39 個承諾／公開／揭示／抬手牌情境皆通過，沒有跨區碰撞、水平溢出或執行錯誤。含 1920×879／880／910／1080、1366×768、1181×880、1180×880、1024×768、812×375、375×812。
+- `tribunal-autoflow.cjs discussion timer formal fate peek chaos drag layout`：發言、計時、正式入口到第二回合、宿命／真理之眼／混沌、布局皆通過。拖曳腳本原先在銘牌期間就找略過按鈕，補上新的 1500ms 等待後單獨重跑 `drag` 通過；沒有因此改動遊戲邏輯。發言 QA 驗證三句位置相同、銘牌不共存、3500ms 間隔與暫停續讀。
+- 正式建置本機預覽 `http://127.0.0.1:5176/` 亦通過 `formal` 完整流程，並確認 1920×910 原角色圖片、SVG 遮擋和打包資產正常；代表畫面 `artifacts/visual-checks/production-layout-fixed.png`。非線上正式站驗收。
+- 維持開發預覽 `http://127.0.0.1:5175/`。`src/game/` 與 `src/assets/` 無修改。`DEBUG_HANDOFF.md` 記錄邊界碰撞與驗證假設；QA 產物依既有規則留在忽略的 `artifacts/`。
+- 下一步：在本機以使用者實際視窗尺寸試玩並檢視畫面；本次未推送 GitHub 或更新正式站。
 
 ## GitHub Synchronization — 2026-09-19
 
