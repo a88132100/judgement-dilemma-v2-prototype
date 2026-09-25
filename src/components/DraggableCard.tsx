@@ -22,7 +22,7 @@ export function DraggableCard({ className = '', disabled = false, imageSrc, labe
   const pieceRef = useRef<HTMLSpanElement>(null);
   const pointerType = useRef('');
 
-  // 觸控先展開牌面，再次點按才出牌；點到別處時只收回牌面。
+  // 觸控點一下選牌並抬起，真正送出仍由操作區確認；點到別處收回牌面。
   useEffect(() => {
     if (!isRaised) return;
     const collapseOutside = (event: PointerEvent) => {
@@ -32,7 +32,7 @@ export function DraggableCard({ className = '', disabled = false, imageSrc, labe
     return () => document.removeEventListener('pointerdown', collapseOutside);
   }, [isRaised]);
 
-  useEffect(() => { setIsRaised(false); }, [selected, disabled]);
+  useEffect(() => { if (!selected || disabled) setIsRaised(false); }, [selected, disabled]);
 
   function handleDragStart(event: DragEvent<HTMLButtonElement>) {
     if (disabled) {
@@ -56,15 +56,16 @@ export function DraggableCard({ className = '', disabled = false, imageSrc, labe
         onPointerDown={(event) => { pointerType.current = event.pointerType; }}
         onKeyDown={() => { pointerType.current = ''; }}
         onClick={(event) => {
-          if (pointerType.current === 'touch' && !isRaised) {
+          if (pointerType.current === 'touch') {
+            if (disabled) {
+              onInspect?.();
+              return;
+            }
+            onClick?.(event.currentTarget);
             setIsRaised(true);
             return;
           }
           onClick?.(event.currentTarget);
-          if (pointerType.current === 'touch') {
-            setIsRaised(false);
-            event.currentTarget.blur();
-          }
         }}
         onDragStart={handleDragStart}
         onDragEnd={() => setIsDragging(false)}

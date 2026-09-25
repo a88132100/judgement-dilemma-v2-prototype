@@ -10,6 +10,9 @@ import { RoundSummaryPanel } from './RoundSummaryPanel';
 import { TableSeatSlots } from './TableSeatSlots';
 import { RoundSettlementDialog } from './RoundSettlementDialog';
 import { advancePhase } from '../game/stateMachine';
+import { useBoardViewport } from './useBoardViewport';
+import { BoardOrientationPrompt } from './BoardOrientationPrompt';
+import '../styles/mobile-board.css';
 
 interface GameBoardProps {
   gameState: GameState;
@@ -42,6 +45,7 @@ function JudgmentSigil() {
 }
 
 export function GameBoard({ gameState, onGameStateChange, onBackToTitle, onRestart, variant = 'classic' }: GameBoardProps) {
+  const { layout, input, needsLandscape } = useBoardViewport();
   const opponents = gameState.players.filter((player) => !player.isHuman);
   const [terminalReviewed, setTerminalReviewed] = useState(false);
   const [reportRead, setReportRead] = useState<RoundResult>();
@@ -89,7 +93,7 @@ export function GameBoard({ gameState, onGameStateChange, onBackToTitle, onResta
   }, [openReport]);
 
   return (
-    <main className="battle-shell tribunal-board" data-entry={variant} data-phase={gameState.phase} data-reading-report={isReadingReport || undefined}>
+    <main className="battle-shell tribunal-board" data-layout={layout} data-input={input} data-entry={variant} data-phase={gameState.phase} data-reading-report={isReadingReport || undefined}>
       <header className="battle-hud tribunal-hud" aria-label="對局資訊">
         <div className="hud-brand">
           <span className="tribunal-brand-sigil"><JudgmentSigil /></span>
@@ -113,6 +117,12 @@ export function GameBoard({ gameState, onGameStateChange, onBackToTitle, onResta
           ))}
         </ol>
         <div className="hud-actions">
+          <button className="hud-icon-button compact-report-button" type="button" onClick={() => setOpenReport('events')} aria-label="審判紀錄" title="審判紀錄">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M6 4h12v16H6zM9 8h6M9 12h6M9 16h4" /></svg>
+          </button>
+          {hasRoundSummary ? <button className="hud-icon-button compact-report-button" type="button" onClick={() => setOpenReport('summary')} aria-label="回合戰報" title="回合戰報">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M4 4h16v16H4zM8 16v-4m4 4V8m4 8v-6" /></svg>
+          </button> : null}
           <button className="hud-icon-button" type="button" onClick={restart} aria-label="重新開始對局" title="重新開始對局">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M4 10a8 8 0 1 1 1 7M4 4v6h6" /></svg>
             <span>重開</span>
@@ -154,8 +164,8 @@ export function GameBoard({ gameState, onGameStateChange, onBackToTitle, onResta
             <div className="tribunal-draw-pile"><span aria-hidden="true" /><strong>{gameState.deck.length}</strong><small>牌庫</small></div>
             <div className="tribunal-discard-pile"><strong>{gameState.discardPile.length}</strong><small>棄牌</small></div>
           </div>
-          <div className="tribunal-table-objects"><ActionPanel gameState={gameState} onGameStateChange={onGameStateChange} flowPaused={Boolean(openReport)} /></div>
-          <RoundSettlementDialog gameState={gameState} onContinue={continueAfterSettlement} onReportComplete={() => setReportRead(currentResult)} paused={Boolean(openReport)} terminal={terminalSettlement} />
+          <div className="tribunal-table-objects"><ActionPanel gameState={gameState} onGameStateChange={onGameStateChange} flowPaused={Boolean(openReport) || needsLandscape} /></div>
+          <RoundSettlementDialog gameState={gameState} onContinue={continueAfterSettlement} onReportComplete={() => setReportRead(currentResult)} paused={Boolean(openReport) || needsLandscape} terminal={terminalSettlement} />
           {!terminalSettlement ? <GameResultPanel gameState={gameState} onRestart={restart} onBackToTitle={onBackToTitle} /> : null}
           <div className="tribunal-report-launchers" aria-label="對局紀錄">
             {hasRoundSummary ? <button type="button" onClick={() => setOpenReport('summary')} aria-haspopup="dialog" aria-controls="tribunal-report">回合戰報</button> : null}
@@ -177,6 +187,7 @@ export function GameBoard({ gameState, onGameStateChange, onBackToTitle, onResta
           {openReport === 'summary' ? <RoundSummaryPanel gameState={gameState} /> : <EventLog events={gameState.eventLog} />}
         </div>
       </dialog>
+      <BoardOrientationPrompt open={needsLandscape} onExit={onBackToTitle} />
     </main>
   );
 }

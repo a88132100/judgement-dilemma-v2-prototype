@@ -1,0 +1,168 @@
+/* 橫向緊湊牌桌：保留完整四席與原素材，操作區固定在可見畫面內。 */
+.tribunal-board .hud-actions .compact-report-button { display: none; }
+.tribunal-board[data-layout="compact"] .hud-actions .compact-report-button { display: flex; }
+html:has(.tribunal-board[data-layout="compact"]), body:has(.tribunal-board[data-layout="compact"]), #root:has(.tribunal-board[data-layout="compact"]),
+html:has(.tribunal-board[data-layout="portrait"]), body:has(.tribunal-board[data-layout="portrait"]), #root:has(.tribunal-board[data-layout="portrait"]) { height: 100%; min-height: 0; overflow: hidden; }
+.tribunal-board[data-layout="compact"], .tribunal-board[data-layout="portrait"] {
+  --hud-height: 44px; height: 100dvh; min-height: 0; overflow: hidden;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  grid-template-rows: var(--hud-height) minmax(0, 1fr);
+}
+.tribunal-board[data-layout="portrait"] .tribunal-arena { visibility: hidden; }
+.board-orientation-prompt { box-sizing: border-box; width: min(90vw, 420px); max-height: 90dvh; overflow: auto; padding: 24px; border: 1px solid #ac8d51; border-radius: 12px; background: radial-gradient(ellipse at top, #293a3d, #0b1418 80%); color: #eee2c8; text-align: center; font: 14px/1.7 "Microsoft JhengHei", sans-serif; }
+.board-orientation-prompt::backdrop { background: #060d12f5; }
+.board-orientation-prompt svg { color: #d7b97a; }
+.board-orientation-prompt h2 { font-size: 24px; color: #edd5a0; margin: 8px 0 14px; }
+.board-orientation-prompt .orientation-eyebrow { margin: 0; letter-spacing: .3em; color: #cfb578; }
+.board-orientation-prompt .orientation-status { color: #b6cbc9; font-size: 12px; }
+.board-orientation-prompt button { min-height: 44px; padding: 8px 24px; }
+.tribunal-board[data-layout="compact"] .tribunal-hud { display: flex; height: var(--hud-height); gap: 12px; padding: 0 10px; }
+.tribunal-board[data-layout="compact"] .hud-brand strong { font-size: 19px; white-space: nowrap; }
+.tribunal-board[data-layout="compact"] :is(.hud-brand small, .tribunal-brand-sigil, .phase-flow, .hud-icon-button span) { display: none; }
+.tribunal-board[data-layout="compact"] .tribunal-round { display: flex; gap: 4px; }
+.tribunal-board[data-layout="compact"] .tribunal-round strong { font-size: 25px; }
+.tribunal-board[data-layout="compact"] .tribunal-round > span { font-size: 11px; }
+.tribunal-board[data-layout="compact"] .tribunal-phase-status { display: flex; align-items: center; gap: 10px; flex: 1; }
+.tribunal-board[data-layout="compact"] .tribunal-phase-status > strong { font-size: 13px; }
+.tribunal-board[data-layout="compact"] .tribunal-flow-status { font-size: 10px; }
+.tribunal-board[data-layout="compact"] .hud-actions { margin-left: auto; }
+.tribunal-board[data-layout="compact"] .hud-icon-button { min-width: 44px; min-height: 44px; padding: 6px; }
+.tribunal-board[data-layout="compact"] :is(.tribunal-arena, .tribunal-scene) { height: 100%; min-height: 0; overflow: hidden; }
+.tribunal-board[data-layout="compact"] .tribunal-scene {
+  container-type: size; --art-width: 100cqw; --art-height: 100cqh; --art-left: 0px; --art-top: 0px;
+  --far-rim: 24.7cqh; --dock-height: clamp(80px, 24cqh, 120px);
+  --table-card-height: clamp(44px, 17cqh, 84px); --own-card-height: clamp(44px, 16cqh, 80px);
+  --far-card-top: calc(var(--far-rim) + 26px);
+  background-size: 100% 100%; background-position: center;
+}
+.tribunal-board[data-layout="compact"] .tribunal-scene::before { background: none; }
+.tribunal-board[data-layout="compact"] .tribunal-table-foreground { display: block; position: absolute; z-index: 2; pointer-events: none; inset: 0; width: 100%; height: 100%; background: var(--tribunal-scene-bg) center / 100% 100% no-repeat; clip-path: url(#tribunal-table-edge); }
+.tribunal-board[data-layout="compact"] .tribunal-opponent-seat {
+  --seat-width: clamp(82px, 30cqh, 170px); --seat-center: 16cqw; --seat-base: 39cqh;
+  width: var(--seat-width); height: var(--seat-width); left: calc(var(--seat-center) - var(--seat-width) / 2); top: calc(var(--seat-base) - var(--seat-width));
+  z-index: auto; transform: none;
+}
+.tribunal-board[data-layout="compact"] .seat-top { --seat-center: 50cqw; --seat-base: 30.2cqh; --seat-width: clamp(70px, 27cqh, 155px); }
+.tribunal-board[data-layout="compact"] .seat-right { --seat-center: 84cqw; }
+.tribunal-board[data-layout="compact"] .seated-character-stage { z-index: 1; }
+.tribunal-board[data-layout="compact"] .seated-character-stage::after { content: none; }
+.tribunal-board[data-layout="compact"] .seated-player-plaque { z-index: 4; top: calc(var(--seat-width) - 5.5cqh + 2px); bottom: auto; padding: 2px 5px; display: flex; align-items: center; justify-content: center; gap: 6px; width: max-content; min-width: 100px; max-width: 28cqw; }
+.tribunal-board[data-layout="compact"] .seat-top .seated-player-plaque { bottom: auto; }
+.tribunal-board[data-layout="compact"] .seat-nameplate h3 { font-size: clamp(11px, 1.6cqw, 15px); white-space: nowrap; }
+.tribunal-board[data-layout="compact"] :is(.seat-personality, .seat-card-readiness, .seat-score-row span) { display: none; }
+.tribunal-board[data-layout="compact"] .seat-score-row strong { font-size: 20px; }
+.tribunal-board[data-layout="compact"] .seat-dealer-mark { top: -17px; left: -4px; width: 19px; height: 19px; font-size: 10px; }
+.tribunal-board[data-layout="compact"] .seat-card.is-eliminated { opacity: 1; filter: none; }
+.tribunal-board[data-layout="compact"] .seat-card.is-eliminated :is(.seated-character-stage, .seated-player-plaque) { opacity: .5; filter: grayscale(1); }
+.tribunal-board[data-layout="compact"] .seat-eliminated-mark { z-index: 5; font-size: 10px; padding: 2px 6px; }
+.tribunal-board[data-layout="compact"] .tribunal-seat-card-stack { display: flex; gap: 9px; transform: translateX(-50%); align-items: center; }
+.tribunal-board[data-layout="compact"] .seat-stack-top { left: 50%; top: var(--far-card-top); }
+.tribunal-board[data-layout="compact"] .seat-stack-left { left: 16%; top: calc(33.5cqh + 28px); }
+.tribunal-board[data-layout="compact"] .seat-stack-right { left: 84%; top: calc(33.5cqh + 28px); }
+.tribunal-board[data-layout="compact"] .tribunal-table-card { width: calc(var(--table-card-height) * .7); height: var(--table-card-height); transform: rotate(-2deg); }
+.tribunal-board[data-layout="compact"] .tribunal-table-card.table-function-card { transform: rotate(2deg); }
+.tribunal-board[data-layout="compact"] .tribunal-table-card small { padding: 1px; font-size: 10px; bottom: 1px; left: 0; right: 0; }
+.tribunal-board[data-layout="compact"] .table-commitment-token { width: clamp(38px, 12cqh, 60px); height: clamp(38px, 12cqh, 60px); }
+.tribunal-board[data-layout="compact"] .table-commitment-token small { font-size: 11px; letter-spacing: 0; bottom: -17px; }
+.tribunal-board[data-layout="compact"] .tribunal-your-table { top: auto; bottom: calc(var(--dock-height) + 18px); left: 50%; height: var(--own-card-height); gap: 16px; transform: translateX(-50%); }
+.tribunal-board[data-layout="compact"] .table-cast-landing { width: calc(var(--own-card-height) * .7); height: var(--own-card-height); transform: rotate(-2deg); }
+.tribunal-board[data-layout="compact"] .table-cast-landing[data-cast-kind="card"] { transform: rotate(2deg); }
+.tribunal-board[data-layout="compact"] .table-cast-landing[data-cast-kind="commitment"] { width: var(--own-card-height); height: var(--own-card-height); margin: 0; transform: none; }
+.tribunal-board[data-layout="compact"] .token-placed .commitment-token-art { width: var(--own-card-height); height: var(--own-card-height); }
+.tribunal-board[data-layout="compact"] .placed-card > span:not(.commitment-token-art) { bottom: -14px; font-size: 10px; }
+.tribunal-board[data-layout="compact"] .tribunal-deck-piles { top: auto; bottom: calc(var(--dock-height) + 8px); right: 8px; gap: 6px; transform: none; font-size: 10px; }
+.tribunal-board[data-layout="compact"] .tribunal-draw-pile { width: 30px; height: 42px; }
+.tribunal-board[data-layout="compact"] .tribunal-draw-pile strong { font-size: 17px; }
+.tribunal-board[data-layout="compact"] .tribunal-deck-piles small { font-size: 8px; }
+.tribunal-board[data-layout="compact"] .tribunal-discard-pile { padding: 3px; }
+.tribunal-board[data-layout="compact"] .player-foreground { --card-width: clamp(46px, 7cqw, 76px); position: absolute; top: auto; bottom: 0; height: var(--dock-height); padding: 0 8px 4px; grid-template-columns: 66px minmax(0, 1fr) 142px; gap: 8px; align-items: end; background: linear-gradient(transparent, #071114ed 22%); }
+.tribunal-board[data-layout="compact"] .self-seat-hud { height: auto; margin: 0; gap: 1px; align-items: flex-start; }
+.tribunal-board[data-layout="compact"] .self-seat-avatar { display: none; }
+.tribunal-board[data-layout="compact"] .self-seat-hud > strong b { font-size: 27px; }
+.tribunal-board[data-layout="compact"] .self-seat-hud > strong { gap: 3px; font-size: 10px; }
+.tribunal-board[data-layout="compact"] .self-seat-hud :is(small, .self-commitment, .self-name) { font-size: 10px; letter-spacing: 0; }
+.tribunal-board[data-layout="compact"] .hand-stage { display: flex; gap: clamp(10px, 3cqw, 30px); align-items: end; }
+.tribunal-board[data-layout="compact"] .operation-group { gap: 3px; margin: 0; }
+.tribunal-board[data-layout="compact"] .operation-label { transform: none; font-size: 10px; letter-spacing: .08em; }
+.tribunal-board[data-layout="compact"] .operation-card-row { gap: 4px; }
+.tribunal-board[data-layout="compact"] .faction-tools { --card-width: clamp(46px, 7cqw, 76px); }
+.tribunal-board[data-layout="compact"] .card-piece { transform: none; margin: 0; }
+.tribunal-board[data-layout="compact"] .hand-fan .card-piece { margin-left: -3px; transform: none; }
+.tribunal-board[data-layout="compact"] .operation-card { height: calc(var(--dock-height) - 20px); min-height: 44px; border-radius: 4px; }
+.tribunal-board[data-layout="compact"] .card-piece:is(:hover, :focus-within, .is-raised) { transform: none; }
+.tribunal-board[data-layout="compact"] .card-piece:is(:focus-within, .is-raised) .operation-card { height: calc(var(--dock-height) - 14px); }
+.tribunal-board[data-layout="compact"] .draggable-card-label,
+.tribunal-board[data-layout="compact"] .card-piece:is(:hover, :focus-within, .is-raised) .draggable-card-label { top: auto; bottom: 0; font-size: 12px; padding: 3px 0; background: #081318ef; }
+.tribunal-board[data-layout="compact"] .draggable-card-note { display: none; }
+.tribunal-board[data-layout="compact"] .card-inspect-button { top: 0; right: 0; min-height: 28px; min-width: 40px; padding: 3px; font-size: 10px; }
+.tribunal-board[data-layout="compact"] .card-piece.is-raised .card-inspect-button { opacity: 1; }
+.tribunal-board[data-layout="compact"] .card-piece:not(.is-raised) .card-inspect-button { pointer-events: none; }
+@media (hover: hover) {
+  .tribunal-board[data-layout="compact"] .card-piece:is(:hover, :focus-within) .card-inspect-button { pointer-events: auto; }
+}
+.tribunal-board[data-layout="compact"] .token-tools .card-piece { width: 48px; flex-basis: 48px; }
+.tribunal-board[data-layout="compact"] .operation-token { height: 60px; min-height: 44px; }
+.tribunal-board[data-layout="compact"] .operation-token .draggable-card-image { width: 44px; height: 44px; }
+.tribunal-board[data-layout="compact"]:not([data-phase="commitment"]) .token-tools,
+.tribunal-board[data-layout="compact"][data-phase="commitment"] .faction-tools { display: none; }
+.tribunal-board[data-layout="compact"] .operation-actions { grid-column: auto; width: 142px; margin: 0; display: flex; flex-flow: row wrap; gap: 4px; justify-content: flex-end; align-items: center; }
+.tribunal-board[data-layout="compact"] .command-caption { width: 100%; font-size: 10px; margin: 0; }
+.tribunal-board[data-layout="compact"] .operation-actions > button { flex: 1; min-width: 64px; min-height: 44px; padding: 5px; font-size: 12px; line-height: 1.3; }
+.tribunal-board[data-layout="compact"] .blank-order-note { display: none; }
+.tribunal-board[data-layout="compact"] .table-error { position: absolute; bottom: var(--dock-height); right: 4px; width: min(300px, 60cqw); }
+.tribunal-board[data-layout="compact"] .tribunal-report-launchers { bottom: 0; right: auto; left: 0; display: none; }
+.tribunal-board[data-layout="compact"] .central-judgement-ui,
+.tribunal-board[data-layout="compact"]:is([data-phase="commitment"], [data-phase="playCards"]) .central-judgement-ui { top: 28%; width: min(500px, 62%); max-height: calc(100% - var(--dock-height) - 30px); padding: 4px; }
+.tribunal-board[data-layout="compact"] .tribunal-plaque { padding: 12px 18px; }
+.tribunal-board[data-layout="compact"] .tribunal-plaque-title { font-size: clamp(20px, 3cqw, 28px); }
+.tribunal-board[data-layout="compact"] .tribunal-plaque-kicker { font-size: 10px; }
+.tribunal-board[data-layout="compact"] .speaker-dialogue { padding: 10px 14px; background: #07151df5; }
+.tribunal-board[data-layout="compact"] .speaker-dialogue p { font-size: 13px; line-height: 1.5; margin-top: 4px; }
+.tribunal-board[data-layout="compact"] .speaker-dialogue strong { font-size: 13px; }
+.tribunal-board[data-layout="compact"] .discussion-controls { margin-top: 3px; gap: 8px; }
+.tribunal-board[data-layout="compact"] .discussion-controls button { min-height: 44px; padding: 6px 14px; }
+.tribunal-board[data-layout="compact"]:is([data-phase="fateDeclare"], [data-phase="resolvePublicCards"]) .central-judgement-ui.has-stage-content { top: 5px; max-height: calc(100% - var(--dock-height) - 10px); width: min(580px, 76%); pointer-events: auto; }
+.tribunal-board[data-layout="compact"] .stage-choice-button { min-height: 44px; }
+.tribunal-board[data-layout="compact"] .tribunal-result { position: fixed; top: 50dvh; max-height: 90dvh; }
+.tribunal-board[data-input="touch"] button { touch-action: manipulation; }
+/* Portal 視窗也依牌桌模式縮排，長內容在視窗內捲動，按鈕保留觸控尺寸。 */
+body:has(.tribunal-board[data-layout="compact"]) .tribunal-modal { max-height: calc(100dvh - 16px); padding: 14px; }
+body:has(.tribunal-board[data-layout="compact"]) .card-effect-body { grid-template-columns: 80px minmax(0, 1fr); gap: 14px; }
+body:has(.tribunal-board[data-layout="compact"]) .card-effect-card { width: 80px; }
+body:has(.tribunal-board[data-layout="compact"]) .card-effect-heading { margin-bottom: 8px; }
+body:has(.tribunal-board[data-layout="compact"]) .card-effect-heading strong { font-size: 21px; }
+body:has(.tribunal-board[data-layout="compact"]) .card-effect-actions { margin-top: 10px; }
+body:has(.tribunal-board[data-layout="compact"]) :is(.tribunal-modal button, .tribunal-modal select, .round-settlement-dialog button) { min-height: 44px; }
+body:has(.tribunal-board[data-layout="compact"]) .tribunal-detail-backdrop { padding: 8px; }
+body:has(.tribunal-board[data-layout="compact"]) .tribunal-card-detail {
+  width: min(860px, calc(100vw - 16px)); max-width: calc(100vw - 16px); height: calc(100dvh - 16px);
+  grid-template-columns: minmax(100px, 26%) minmax(0, 1fr); align-items: start; gap: 18px; overflow-y: auto;
+}
+body:has(.tribunal-board[data-layout="compact"]) .card-detail-visual { position: sticky; top: 0; width: 100%; }
+body:has(.tribunal-board[data-layout="compact"]) .card-detail-visual img { width: 100%; max-height: calc(100dvh - 48px); object-fit: contain; }
+body:has(.tribunal-board[data-layout="compact"]) .card-detail-copy { width: 100%; padding-top: 2px; }
+body:has(.tribunal-board[data-layout="compact"]) .card-detail-copy h2 { font-size: 24px; margin: 4px 64px 8px 0; }
+body:has(.tribunal-board[data-layout="compact"]) .card-detail-copy dl { gap: 10px; }
+body:has(.tribunal-board[data-layout="compact"]) .card-detail-copy dd { font-size: 14px; line-height: 1.6; }
+body:has(.tribunal-board[data-layout="compact"]) .card-detail-close { z-index: 2; top: 8px; right: 8px; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-dialog { width: calc(100vw - 24px); height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-header { padding: 6px 16px; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-header .tribunal-plaque { padding: 8px 18px; margin-bottom: 4px; min-height: 0; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-header .tribunal-plaque-title { font-size: 22px; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-header p { font-size: 12px; }
+body:has(.tribunal-board[data-layout="compact"]) :is(.round-settlement-results, .round-card-report) { padding: 10px 16px; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-footer { padding: 6px 12px; gap: 12px; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-reading { font-size: 11px; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-player-main { grid-template-columns: minmax(0, 1fr) 84px 42px; gap: 8px; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-factions { grid-row: 2; grid-column: 1 / -1; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-player-name { grid-column: 1; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-score { grid-column: 2; }
+body:has(.tribunal-board[data-layout="compact"]) .round-settlement-delta { grid-column: 3; }
+.tribunal-board[data-layout="compact"] .tribunal-report-close { min-height: 44px; }
+@media (max-height: 360px) {
+  .tribunal-board[data-layout="compact"] { --hud-height: 36px; }
+  .tribunal-board[data-layout="compact"] .tribunal-scene { --dock-height: 72px; --table-card-height: 44px; --own-card-height: 44px; }
+  .tribunal-board[data-layout="compact"] .hud-icon-button { min-height: 36px; }
+  .tribunal-board[data-layout="compact"] .self-name { display: none; }
+  .tribunal-board[data-layout="compact"] .operation-token { height: 52px; }
+}

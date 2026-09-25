@@ -8,6 +8,30 @@
 
 Polish / 牌桌與發言修正完成；真理之眼下拉選單可讀性修正通過本機驗收（2026-09-23）。原始素材與遊戲規則保持不變；本次依使用者指示將累積修正同步至 GitHub `origin/main`。
 
+## Web Adaptive Layout — 2026-09-24
+
+接續使用者先前授權的網頁版手機布局工作。本節只涉及 Web 介面，保留目前 Godot 主開發方向與並行移植檔案；未修改規則、美術原圖或 Godot。
+
+- 新增 `src/components/useBoardViewport.ts`，依視窗大小、直橫向與觸控能力自動選擇 desktop／compact／portrait，不使用 UA 或手動版本切換。監聽 media query 變化，不重新建立對局。
+- `GameBoard.tsx` 與新增 `BoardOrientationPrompt.tsx`：小螢幕直向使用原生橫放提示視窗，暫停階段與戰報／結算倒數；橫放後接續同一狀態。主畫面及選人仍可直向使用，提示內可返回主畫面。緊湊 HUD 保留紀錄與戰報入口。
+- 新增 `src/styles/mobile-board.css`：手機／平板橫向的完整四席牌桌、桌緣角色遮擋、各席桌牌／Token、固定手牌與確認按鈕。牌桌不需要整頁捲動；詳情、公開牌與結算使用適合矮畫面的視窗和內部捲動。`index.html` 加入 `viewport-fit=cover`，配合安全區留白與 `100dvh`。
+- `DraggableCard.tsx`：觸控一次選取並抬起，仍須確認才送出；不可使用的牌可點按查看。修正隱藏的查看按鈕攔截矮螢幕選牌，保留滑鼠懸停查看與桌機拖曳。
+
+### Verification
+
+- `npm run test`：9 檔、136 項全部通過。`npm run build` 通過；最終 JS `index-bgs6X4sG.js`、CSS `index-D6aSEjn8.css`。
+- `artifacts/visual-checks/mobile-board.cjs`：667×375、844×390、740×320、915×412、1024×768 的滿桌布局無跨席位碰撞、水平或垂直頁面溢出；已目視檢查代表截圖。
+- `mobile-flow.cjs`／`mobile-small.cjs`：667×375、844×390、740×320、568×320 觸控承諾、選陣營／功能牌、查看詳情、戰報、結算、第二回合通過。發言及戰報轉為直向停留 20／25 秒不推進；橫放正常續讀；Esc 不解除直向提示。
+- `mobile-effects.cjs fate peek chaos formal`：740×320 宿命、真理之眼三位目標／鎖定／私查／換陣營、混沌指定與正式入口通過。最終正式建置本機預覽 5176 的 `formal` 也通過至第二回合，無頁面執行錯誤。
+- `mobile-entry.cjs`：390×844 主画面、選人、橫放提示、旋轉與返回主畫面通過。`mobile-edge.cjs`：568×320 三張手牌触控查看、小視窗滑鼠查看通過。
+- `tribunal-autoflow.cjs discussion drag formal`：桌機發言順序、原生拖曳及完整回合回歸通過。React 檢查涵蓋 media query 訂閱清理、穩定快照、視窗語義與既有暫停流程。
+- 腳本、截圖及結果留在既有忽略的 `artifacts/visual-checks/`。開發預覽 `http://127.0.0.1:5175/`，正式建置本機預覽 `http://127.0.0.1:5176/`。
+
+### Limits / Next Safest Task
+
+- 驗證使用 Chrome 的手機 viewport／觸控模擬，不等同 iOS Safari／Android 真機；實際瀏海、安全區及瀏覽器工具列仍需真機試玩。
+- 使用者已於 2026-09-24 授權將這次網頁自動布局提交並推送至 GitHub `origin/main`；Godot 移植的其他本機改動保留未提交。推送後若 Vercel 已連動 Git，可能觸發自動部署，線上結果尚未驗證。下一步以真機確認手牌辨識、點按與安全區；Godot 手機／Web 匯出仍屬獨立待辦。
+
 ## GitHub Synchronization — 2026-09-23
 
 - 使用者已授權提交與推送目前全部改動：桌緣角色遮擋、跨席位出牌間距、發言銘牌與對話順序、真理之眼下拉選單配色，以及測試與交接文件。
