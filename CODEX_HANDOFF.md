@@ -8,6 +8,16 @@
 
 Polish / 牌桌與發言修正完成；真理之眼下拉選單可讀性修正通過本機驗收（2026-09-23）。原始素材與遊戲規則保持不變；本次依使用者指示將累積修正同步至 GitHub `origin/main`。
 
+## Web Phone Readability — 2026-09-26
+
+- 依使用者提供的手機 Safari 橫向截圖調整 `src/styles/mobile-board.css`，未改規則、原圖、桌機樣式或 Godot 工作。
+- 己方承諾 Token 移至己方桌牌右側並增加間距，與對手印記錯開；手機手牌加高 12px、完整呈現原卡圖，點選後抬高至少 90px。移除手牌上方分類標籤，留出桌牌文字空間。
+- 底部固定網格列高，抬牌向上展開而不擠出畫面；確認區加寬至 184px，按鈕文案保持單行。發言區上移，避免小尺寸被手牌擋住。300px 極矮高度另調整己方牌高與間距。
+- `mobile-real-viewport.cjs`：824×324、844×300、568×320、1024×768 無跨席桌牌碰撞或頁面溢出；目視檢查極矮满桌與 824×324 選牌截圖。尺寸是對可用空間的模擬，不聲稱與使用者手機 CSS viewport 完全一致。
+- `mobile-flow.cjs`、`mobile-small.cjs`、`mobile-real-flow.cjs`：667×375、844×390、740×320、568×320、824×324 完整觸控回合、旋轉暫停、詳情與結算通過。`mobile-edge.cjs` 三張手牌及滑鼠查看通過；`mobile-effects.cjs fate peek chaos formal` 通過。
+- `npm run build` 與 `git diff --check` 通過；JS `index-COMAGoxQ.js`、CSS `index-GPS2sxyb.css`。本次只有手機 CSS 變動，未重跑規則單元測試。代表截圖 `artifacts/visual-checks/mobile-flow/824-selected.png`。
+- 使用者已授權將本次手機修正同步至 GitHub `origin/main`；其他 Godot 本機工作保留未提交。Git 連動部署與 Safari 真機結果仍待確認。瀏覽器原生工具列不由網頁控制，本次針對扣除工具列後的空間調整。
+
 ## Web Adaptive Layout — 2026-09-24
 
 接續使用者先前授權的網頁版手機布局工作。本節只涉及 Web 介面，保留目前 Godot 主開發方向與並行移植檔案；未修改規則、美術原圖或 Godot。
